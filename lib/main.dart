@@ -5,28 +5,33 @@ import 'core/theme/app_theme.dart';
 import 'core/routes/app_routes.dart';
 import 'data/storage/local_storage.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  runApp(const CalcForAllApp());
+
+  final storage = LocalStorage();
+  await storage.init();
+
+  runApp(CalcForAllApp(storage: storage));
 }
 
 class CalcForAllApp extends StatelessWidget {
-  const CalcForAllApp({super.key});
+  final LocalStorage storage;
+
+  const CalcForAllApp({
+    super.key,
+    required this.storage,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: storage),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) {
-          final storage = LocalStorage();
-          storage.init(); // Initialisation asynchrone
-          return storage;
-        }),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

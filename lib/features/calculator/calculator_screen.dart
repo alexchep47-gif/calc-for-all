@@ -21,7 +21,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   void _onButtonPressed(String value) {
     setState(() {
-      if (_justCalculated && !_isOperator(value) && value != '=') {
+      if (_justCalculated && !_isOperator(value) && value != '=' && value != '⌫') {
         _expression = '';
         _justCalculated = false;
       }
@@ -41,14 +41,28 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             final res = _service.evaluate(_expression);
             _result = res;
             _justCalculated = true;
-            // Sauvegarde dans l'historique
             context.read<LocalStorage>().addToHistory(_expression, res);
           }
           break;
+        // Fonctions scientifiques : on insère le nom + parenthèse ouvrante
+        case 'sin':
+        case 'cos':
+        case 'tan':
+        case 'log':
+        case 'ln':
+        case '√':
+          _expression += value == '√' ? 'sqrt(' : '$value(';
+          break;
+        case 'π':
+          _expression += 'π';
+          break;
+        case '^':
+          _expression += '^';
+          break;
         default:
           _expression += value;
-          _justCalculated = false;
       }
+      _justCalculated = false;
     });
   }
 
@@ -103,7 +117,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     child: Text(
                       _expression.isEmpty ? '0' : _expression,
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 26,
                         color: Colors.grey.shade600,
                       ),
                     ),
@@ -112,7 +126,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   Text(
                     _result,
                     style: const TextStyle(
-                      fontSize: 48,
+                      fontSize: 42,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,
@@ -126,7 +140,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           Expanded(
             flex: 5,
             child: Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               child: Column(
                 children: [
                   _buildRow(['C', '⌫', '%', '÷']),
@@ -135,7 +149,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   _buildRow(['1', '2', '3', '+']),
                   _buildRow(['0', '.', 'π', '=']),
                   _buildRow(['sin', 'cos', 'tan', '√']),
-                  _buildRow(['log', 'ln', '^', '( )']),
+                  _buildRow(['log', 'ln', '^', '(']),
+                  _buildRow([')', 'e', '!', '']),
                 ],
               ),
             ),
@@ -149,24 +164,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return Expanded(
       child: Row(
         children: buttons.map((b) {
+          if (b.isEmpty) return const Expanded(child: SizedBox());
           final isOp = _isOperator(b) || b == '=' || b == 'C' || b == '⌫';
           return Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(3),
               child: CustomButton(
                 label: b,
                 isOperator: isOp,
-                onTap: () {
-                  if (b == '( )') {
-                    // Bascule simple entre ( et )
-                    _onButtonPressed(_expression.contains('(') &&
-                            !_expression.contains(')')
-                        ? ')'
-                        : '(');
-                  } else {
-                    _onButtonPressed(b);
-                  }
-                },
+                onTap: () => _onButtonPressed(b),
               ),
             ),
           );

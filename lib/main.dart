@@ -4,12 +4,9 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routes/app_routes.dart';
 import 'data/storage/local_storage.dart';
-import 'features/onboarding/onboarding_screen.dart';
-import 'features/calculator/calculator_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Orientation portrait uniquement pour une meilleure utilisabilité d'une main
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -25,7 +22,11 @@ class CalcForAllApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => LocalStorage()),
+        ChangeNotifierProvider(create: (_) {
+          final storage = LocalStorage();
+          storage.init(); // Initialisation asynchrone
+          return storage;
+        }),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -37,7 +38,6 @@ class CalcForAllApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
             initialRoute: AppRoutes.onboarding,
             routes: AppRoutes.routes,
-            onGenerateRoute: AppRoutes.onGenerateRoute,
           );
         },
       ),

@@ -8,16 +8,24 @@ class CalculatorService {
   /// Évalue une expression mathématique et retourne le résultat sous forme de String
   String evaluate(String expression) {
     try {
-      // Remplacements pour une saisie plus naturelle
       String expr = expression
           .replaceAll('×', '*')
           .replaceAll('÷', '/')
+          .replaceAll('−', '-')
           .replaceAll('π', 'pi')
           .replaceAll('√', 'sqrt')
           .replaceAll('²', '^2')
           .replaceAll('³', '^3');
 
-      // Gestion du pourcentage simple
+      // Factorielle simple (n!)
+      expr = expr.replaceAllMapped(RegExp(r'(\d+)!'), (m) {
+        final n = int.parse(m.group(1)!);
+        int fact = 1;
+        for (int i = 2; i <= n; i++) fact *= i;
+        return fact.toString();
+      });
+
+      // Pourcentage
       if (expr.contains('%')) {
         expr = expr.replaceAllMapped(
           RegExp(r'(\d+(?:\.\d+)?)%'),
@@ -28,32 +36,17 @@ class CalculatorService {
       Expression exp = _parser.parse(expr);
       double result = exp.evaluate(EvaluationType.REAL, _context);
 
-      // Formatage propre
+      if (result.isNaN || result.isInfinite) return 'Erreur';
+
       if (result == result.roundToDouble()) {
         return result.toInt().toString();
       }
-      // Limite à 10 décimales utiles
       String formatted = result.toStringAsFixed(10);
       formatted = formatted.replaceAll(RegExp(r'0+$'), '');
       formatted = formatted.replaceAll(RegExp(r'\.$'), '');
       return formatted;
     } catch (e) {
       return 'Erreur';
-    }
-  }
-
-  /// Vérifie si l'expression est valide (sans l'évaluer complètement)
-  bool isValid(String expression) {
-    try {
-      String expr = expression
-          .replaceAll('×', '*')
-          .replaceAll('÷', '/')
-          .replaceAll('π', 'pi')
-          .replaceAll('√', 'sqrt');
-      _parser.parse(expr);
-      return true;
-    } catch (_) {
-      return false;
     }
   }
 }

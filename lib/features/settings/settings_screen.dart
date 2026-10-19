@@ -85,7 +85,8 @@ class SettingsScreen extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              'Calc For All est une calculatrice hors ligne, légère et complète.\n'\n              'Fonctionnalités : calculatrice scientifique, tracé de courbes, nombres complexes.',
+              'Calc For All est une calculatrice hors ligne, légère et complète.\n'
+              'Fonctionnalités : calculatrice scientifique, tracé de courbes, nombres complexes.',
               style: TextStyle(color: Colors.grey),
             ),
           ),

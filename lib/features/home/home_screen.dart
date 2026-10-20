@@ -11,8 +11,10 @@ class HomeScreen extends StatelessWidget {
       _Module('Calculatrice', 'Scientifique + fractions', Icons.calculate_rounded, const Color(0xFF1565C0), AppRoutes.calculator),
       _Module('Étude de fonction', '8 étapes + graphique + PDF', Icons.show_chart_rounded, const Color(0xFF2E7D32), AppRoutes.graph),
       _Module('Solveur d’équations', 'Polynômes de degré n', Icons.architecture_rounded, const Color(0xFF6A1B9A), AppRoutes.solver),
+      _Module('Matrices', '2×2 et 3×3 + déterminant + inverse', Icons.grid_on_rounded, const Color(0xFF0277BD), AppRoutes.matrices),
+      _Module('Cercle trigonométrique', 'Interactif cos / sin / tan', Icons.radar_rounded, const Color(0xFF00838F), AppRoutes.unitCircle),
       _Module('Dérivée & Intégrale', 'Calcul + explications', Icons.functions_rounded, const Color(0xFF4527A0), AppRoutes.derivative),
-      _Module('Probabilités', 'Permutations, arrangements, combinaisons', Icons.casino_rounded, const Color(0xFF00838F), AppRoutes.probability),
+      _Module('Probabilités', 'Permutations, arrangements, combinaisons', Icons.casino_rounded, const Color(0xFF00695C), AppRoutes.probability),
       _Module('Statistiques', 'Tableau de données + indicateurs', Icons.bar_chart_rounded, const Color(0xFFEF6C00), AppRoutes.statistics),
       _Module('Nombres complexes', 'Opérations + forme polaire', Icons.blur_on_rounded, const Color(0xFFAD1457), AppRoutes.complex),
       _Module('Convertisseur', 'Devises, longueurs, masses…', Icons.swap_horiz_rounded, const Color(0xFF455A64), AppRoutes.converter),
@@ -37,7 +39,7 @@ class HomeScreen extends StatelessWidget {
           ...modules.asMap().entries.map((entry) {
             final i = entry.key;
             final m = entry.value;
-            return _ModuleCard(module: m).animate().fadeIn(delay: (60 * i).ms, duration: 350.ms).slideY(begin: 0.12, end: 0);
+            return _ModuleCard(module: m).animate().fadeIn(delay: (50 * i).ms, duration: 300.ms).slideY(begin: 0.1, end: 0);
           }),
         ],
       ),
@@ -60,33 +62,32 @@ class _ModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.pushNamed(context, module.route),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: module.color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(module.icon, color: module.color, size: 28),
+                child: Icon(module.icon, color: module.color, size: 26),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(module.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(module.subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                    Text(module.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    Text(module.subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   ],
                 ),
               ),

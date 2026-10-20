@@ -1,11 +1,11 @@
 {
-    "name": "calc_for_all",
-    "short_name": "calc_for_all",
+    "name": "Calc For All",
+    "short_name": "CFA",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Calc For All - Calculatrice scientifique et étude de fonctions hors-ligne.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

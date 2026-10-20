@@ -24,12 +24,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingPage(
       icon: Icons.show_chart_rounded,
       title: 'Étude de fonction',
-      description: 'Domaine, dérivée, tableau de variation, asymptotes… et export PDF.',
+      description:
+          'Domaine, dérivée, tableau de variation, asymptotes… et export PDF.',
     ),
     _OnboardingPage(
       icon: Icons.school_rounded,
       title: 'Tout pour les maths',
-      description: 'Probabilités, statistiques, convertisseur, complexes, dérivées…',
+      description:
+          'Probabilités, statistiques, convertisseur, complexes, dérivées…',
     ),
   ];
 
@@ -74,11 +76,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(page.icon, size: 100, color: Theme.of(context).primaryColor),
+                        if (index == 0)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: Image.asset(
+                              'assets/CFA.png',
+                              width: 160,
+                              height: 160,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        else
+                          Icon(page.icon,
+                              size: 100, color: Theme.of(context).primaryColor),
                         const SizedBox(height: 40),
                         Text(
                           page.title,
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
@@ -102,7 +119,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: _currentPage == i ? 24 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: _currentPage == i ? Theme.of(context).primaryColor : Colors.grey.shade400,
+                    color: _currentPage == i
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey.shade400,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -117,7 +136,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_currentPage < _pages.length - 1) {
-                      _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                      _controller.nextPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut);
                     } else {
                       _finish();
                     }
@@ -140,5 +161,6 @@ class _OnboardingPage {
   final IconData icon;
   final String title;
   final String description;
-  _OnboardingPage({required this.icon, required this.title, required this.description});
+  _OnboardingPage(
+      {required this.icon, required this.title, required this.description});
 }

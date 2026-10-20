@@ -2,7 +2,7 @@
     <application
         android:label="Calc For All"
         android:name="${applicationName}"
-        android:icon="@drawable/launch_background">
+        android:icon="@drawable/cfa_logo">
         <activity
             android:name=".MainActivity"
             android:exported="true"

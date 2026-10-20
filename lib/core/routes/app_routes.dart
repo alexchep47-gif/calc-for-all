@@ -13,6 +13,8 @@ import '../../features/derivative/derivative_screen.dart';
 import '../../features/solver/solver_screen.dart';
 import '../../features/matrices/matrices_screen.dart';
 import '../../features/trigonometry/unit_circle_screen.dart';
+import '../../features/sequences/sequences_screen.dart';
+import '../../features/geometry/geometry_screen.dart';
 
 class AppRoutes {
   static const String onboarding = '/';
@@ -29,6 +31,8 @@ class AppRoutes {
   static const String solver = '/solver';
   static const String matrices = '/matrices';
   static const String unitCircle = '/unit-circle';
+  static const String sequences = '/sequences';
+  static const String geometry = '/geometry';
 
   static Map<String, WidgetBuilder> get routes => {
         onboarding: (context) => const OnboardingScreen(),
@@ -45,5 +49,7 @@ class AppRoutes {
         solver: (context) => const SolverScreen(),
         matrices: (context) => const MatricesScreen(),
         unitCircle: (context) => const UnitCircleScreen(),
+        sequences: (context) => const SequencesScreen(),
+        geometry: (context) => const GeometryScreen(),
       };
 }

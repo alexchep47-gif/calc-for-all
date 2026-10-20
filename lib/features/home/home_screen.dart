@@ -9,16 +9,18 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final modules = [
       _Module('Calculatrice', 'Scientifique + fractions', Icons.calculate_rounded, const Color(0xFF1565C0), AppRoutes.calculator),
-      _Module('Étude de fonction', '8 étapes + graphique + PDF', Icons.show_chart_rounded, const Color(0xFF2E7D32), AppRoutes.graph),
+      _Module('Étude de fonction', 'Graphique + analyse + PDF', Icons.show_chart_rounded, const Color(0xFF2E7D32), AppRoutes.graph),
       _Module('Solveur d’équations', 'Polynômes de degré n', Icons.architecture_rounded, const Color(0xFF6A1B9A), AppRoutes.solver),
-      _Module('Matrices', '2×2 et 3×3 + déterminant + inverse', Icons.grid_on_rounded, const Color(0xFF0277BD), AppRoutes.matrices),
+      _Module('Matrices', '2×2 / 3×3 + det + inverse', Icons.grid_on_rounded, const Color(0xFF0277BD), AppRoutes.matrices),
       _Module('Cercle trigonométrique', 'Interactif cos / sin / tan', Icons.radar_rounded, const Color(0xFF00838F), AppRoutes.unitCircle),
+      _Module('Suites numériques', 'Arithmétiques & géométriques', Icons.format_list_numbered_rounded, const Color(0xFF5D4037), AppRoutes.sequences),
+      _Module('Géométrie', 'Pythagore, Thalès, aires, volumes', Icons.pentagon_rounded, const Color(0xFF37474F), AppRoutes.geometry),
       _Module('Dérivée & Intégrale', 'Calcul + explications', Icons.functions_rounded, const Color(0xFF4527A0), AppRoutes.derivative),
       _Module('Probabilités', 'Permutations, arrangements, combinaisons', Icons.casino_rounded, const Color(0xFF00695C), AppRoutes.probability),
-      _Module('Statistiques', 'Tableau de données + indicateurs', Icons.bar_chart_rounded, const Color(0xFFEF6C00), AppRoutes.statistics),
+      _Module('Statistiques', 'Série de données + indicateurs', Icons.bar_chart_rounded, const Color(0xFFEF6C00), AppRoutes.statistics),
       _Module('Nombres complexes', 'Opérations + forme polaire', Icons.blur_on_rounded, const Color(0xFFAD1457), AppRoutes.complex),
       _Module('Convertisseur', 'Devises, longueurs, masses…', Icons.swap_horiz_rounded, const Color(0xFF455A64), AppRoutes.converter),
-      _Module('Historique', 'Tes derniers calculs', Icons.history_rounded, const Color(0xFF5D4037), AppRoutes.history),
+      _Module('Historique', 'Tes derniers calculs', Icons.history_rounded, const Color(0xFF4E342E), AppRoutes.history),
     ];
 
     return Scaffold(
@@ -39,7 +41,7 @@ class HomeScreen extends StatelessWidget {
           ...modules.asMap().entries.map((entry) {
             final i = entry.key;
             final m = entry.value;
-            return _ModuleCard(module: m).animate().fadeIn(delay: (50 * i).ms, duration: 300.ms).slideY(begin: 0.1, end: 0);
+            return _ModuleCard(module: m).animate().fadeIn(delay: (40 * i).ms, duration: 280.ms).slideY(begin: 0.08, end: 0);
           }),
         ],
       ),

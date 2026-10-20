@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:share_plus/share_plus.dart';
+
 import '../../data/services/graph_service.dart';
 import '../../data/services/function_analysis_service.dart';
 
@@ -17,10 +21,13 @@ class GraphScreen extends StatefulWidget {
   State<GraphScreen> createState() => _GraphScreenState();
 }
 
-class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStateMixin {
+class _GraphScreenState extends State<GraphScreen>
+    with SingleTickerProviderStateMixin {
   final GraphService _graphService = GraphService();
   final FunctionAnalysisService _analysisService = FunctionAnalysisService();
-  final TextEditingController _funcController = TextEditingController(text: 'sin(x)');
+  final TextEditingController _funcController = TextEditingController(
+    text: 'sin(x)',
+  );
 
   List<FlSpot> _spots = [];
   FunctionStudyResult? _study;
@@ -29,6 +36,7 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
   String _error = '';
   bool _loading = false;
   late TabController _tabController;
+  final GlobalKey _chartKey = GlobalKey();
 
   @override
   void initState() {
@@ -84,42 +92,88 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
   Future<void> _exportPdf() async {
     if (_study == null) return;
 
+    final regular = pw.Font.ttf(
+      (await rootBundle.load('assets/DejaVuSans.ttf')),
+    );
+    final bold = pw.Font.ttf(
+      (await rootBundle.load('assets/DejaVuSans-Bold.ttf')),
+    );
+    pw.MemoryImage? chartImage;
+    final renderObject = _chartKey.currentContext?.findRenderObject();
+    if (renderObject is RenderRepaintBoundary) {
+      final image = await renderObject.toImage(pixelRatio: 2.0);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes != null)
+        chartImage = pw.MemoryImage(bytes.buffer.asUint8List());
+      image.dispose();
+    }
     final pdf = pw.Document();
+    final base = pw.TextStyle(font: regular, fontSize: 10);
+    final heading = pw.TextStyle(font: bold, fontSize: 13);
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        theme: pw.ThemeData.withFont(base: regular, bold: bold),
         build: (context) => [
-          pw.Header(level: 0, child: pw.Text('Étude de fonction – Calc For All')),
+          pw.Header(
+            level: 0,
+            child: pw.Text(
+              'Étude de fonction - Calc For All',
+              style: pw.TextStyle(font: bold, fontSize: 20),
+            ),
+          ),
           pw.SizedBox(height: 12),
-          pw.Text('Fonction : f(x) = ${_study!.expression}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Fonction : f(x) = ${_study!.expression}',
+            style: pw.TextStyle(font: bold, fontSize: 16),
+          ),
           pw.SizedBox(height: 16),
-          pw.Text('1. Domaine de définition', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(_study!.domain),
+          pw.Text('1. Domaine de définition', style: heading),
+          pw.Text(_study!.domain, style: base),
           pw.SizedBox(height: 10),
-          pw.Text('2. Périodicité', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(_study!.period),
+          pw.Text('2. Dérivée symbolique', style: heading),
+          pw.Text('f′(x) = ${_study!.derivative}', style: base),
           pw.SizedBox(height: 10),
-          pw.Text('3. Extremums', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          ..._study!.extrema.map((e) => pw.Text('• $e')),
+          pw.Text('3. Limites', style: heading),
+          pw.Text(_study!.limits, style: base),
           pw.SizedBox(height: 10),
-          pw.Text('4. Asymptotes', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          ..._study!.asymptotes.map((e) => pw.Text('• $e')),
+          pw.Text('4. Extremums', style: heading),
+          ..._study!.extrema.map((e) => pw.Text('- $e', style: base)),
           pw.SizedBox(height: 10),
-          pw.Text('5. Symétrie', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(_study!.symmetry),
+          pw.Text('5. Asymptotes', style: heading),
+          ..._study!.asymptotes.map((e) => pw.Text('- $e', style: base)),
+          pw.SizedBox(height: 10),
+          pw.Text('6. Périodicité et parité', style: heading),
+          pw.Text('${_study!.period} ${_study!.symmetry}', style: base),
           pw.SizedBox(height: 16),
-          pw.Text('Tableau de variation (extrait)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(_study!.variationTable, style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('7. Tableau de variation', style: heading),
+          pw.Text(
+            _study!.variationTable,
+            style: pw.TextStyle(font: regular, fontSize: 8),
+          ),
           pw.SizedBox(height: 16),
-          pw.Text('Explications', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(_study!.explanations, style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('8. Courbe', style: heading),
+          if (chartImage != null)
+            pw.Container(
+              height: 230,
+              child: pw.Image(chartImage, fit: pw.BoxFit.contain),
+            ),
+          pw.SizedBox(height: 12),
+          pw.Text('Explications', style: heading),
+          pw.Text(_study!.explanations, style: base),
           pw.SizedBox(height: 20),
-          pw.Text('Généré par Calc For All', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+          pw.Text(
+            'Généré par Calc For All',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey),
+          ),
         ],
       ),
     );
 
-    await Printing.sharePdf(bytes: await pdf.save(), filename: 'etude_fonction.pdf');
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'etude_fonction.pdf',
+    );
   }
 
   @override
@@ -158,7 +212,9 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
                     decoration: InputDecoration(
                       labelText: 'f(x) =',
                       hintText: 'ex: sin(x), x^2, 1/x, cos(x)+x',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       filled: true,
                     ),
                     onSubmitted: (_) => _analyze(),
@@ -169,10 +225,19 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
                   onPressed: _loading ? null : _analyze,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   child: _loading
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.play_arrow_rounded),
                 ),
               ],
@@ -240,7 +305,9 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
         child: Text(label),
       ),
@@ -251,41 +318,54 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
     if (_spots.isEmpty) {
       return const Center(child: Text('Aucune courbe'));
     }
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: LineChart(
-        LineChartData(
-          gridData: const FlGridData(show: true),
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 36)),
-            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          borderData: FlBorderData(show: true),
-          lineBarsData: [
-            LineChartBarData(
-              spots: _spots,
-              isCurved: true,
-              color: primary,
-              barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: primary.withOpacity(0.08),
+    return RepaintBoundary(
+      key: _chartKey,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: LineChart(
+          LineChartData(
+            gridData: const FlGridData(show: true),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 36),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 28),
+              ),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
               ),
             ),
-          ],
-          minX: _xMin,
-          maxX: _xMax,
-        ),
-      ).animate().fadeIn(duration: 400.ms),
+            borderData: FlBorderData(show: true),
+            lineBarsData: [
+              LineChartBarData(
+                spots: _spots,
+                isCurved: true,
+                color: primary,
+                barWidth: 2.5,
+                dotData: const FlDotData(show: false),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: primary.withOpacity(0.08),
+                ),
+              ),
+            ],
+            minX: _xMin,
+            maxX: _xMax,
+          ),
+        ).animate().fadeIn(duration: 400.ms),
+      ),
     );
   }
 
   Widget _buildStudy() {
     if (_study == null) {
-      return const Center(child: Text('Analyse une fonction pour voir l’étude'));
+      return const Center(
+        child: Text('Analyse une fonction pour voir l’étude'),
+      );
     }
 
     return ListView(
@@ -293,12 +373,30 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
       children: [
         _section('Fonction', 'f(x) = ${_study!.expression}', Icons.functions),
         _section('Domaine de définition', _study!.domain, Icons.domain),
+        _section(
+          'Dérivée symbolique',
+          'f′(x) = ${_study!.derivative}',
+          Icons.functions,
+        ),
+        _section('Limites', _study!.limits, Icons.compare_arrows),
         _section('Périodicité', _study!.period, Icons.loop),
         _sectionList('Extremums', _study!.extrema, Icons.trending_up),
-        _sectionList('Asymptotes', _study!.asymptotes, Icons.vertical_align_center),
+        _sectionList(
+          'Asymptotes',
+          _study!.asymptotes,
+          Icons.vertical_align_center,
+        ),
         _section('Symétrie', _study!.symmetry, Icons.swap_horiz),
-        _section('Tableau de variation (extrait)', _study!.variationTable, Icons.table_chart),
-        _section('Explications détaillées', _study!.explanations, Icons.menu_book),
+        _section(
+          'Tableau de variation (extrait)',
+          _study!.variationTable,
+          Icons.table_chart,
+        ),
+        _section(
+          'Explications détaillées',
+          _study!.explanations,
+          Icons.menu_book,
+        ),
         const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: _exportPdf,
@@ -306,7 +404,9 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
           label: const Text('Exporter le plan d’étude en PDF'),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ).animate().fadeIn(delay: 200.ms),
         const SizedBox(height: 30),
@@ -327,7 +427,13 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
               children: [
                 Icon(icon, size: 20, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 8),
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -351,14 +457,22 @@ class _GraphScreenState extends State<GraphScreen> with SingleTickerProviderStat
               children: [
                 Icon(icon, size: 20, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 8),
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
-            ...items.map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• $e'),
-                )),
+            ...items.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• $e'),
+              ),
+            ),
           ],
         ),
       ),

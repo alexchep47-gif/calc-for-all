@@ -1,9 +1,13 @@
 import 'dart:math' as math;
-import 'package:math_expressions/math_expressions.dart';
+
+import 'graph_service.dart';
+import 'math_expression_engine.dart';
 
 class FunctionStudyResult {
   final String expression;
   final String domain;
+  final String derivative;
+  final String limits;
   final String period;
   final List<String> extrema;
   final List<String> asymptotes;
@@ -15,6 +19,8 @@ class FunctionStudyResult {
   FunctionStudyResult({
     required this.expression,
     required this.domain,
+    required this.derivative,
+    required this.limits,
     required this.period,
     required this.extrema,
     required this.asymptotes,
@@ -26,32 +32,43 @@ class FunctionStudyResult {
 }
 
 class FunctionAnalysisService {
-  final Parser _parser = Parser();
+  final MathExpressionEngine _engine;
+  final GraphService _graph;
+  FunctionAnalysisService({MathExpressionEngine? engine})
+      : _engine = engine ?? MathExpressionEngine(),
+        _graph = GraphService(engine: engine ?? MathExpressionEngine());
 
-  FunctionStudyResult analyze(String expression, {double xMin = -10, double xMax = 10}) {
-    final expr = _normalize(expression);
-
-    // Ajuster l'intervalle si log/ln détecté
-    var range = _suggestRange(expr, xMin, xMax);
-    var points = _sample(expr, range.$1, range.$2, 400);
-
-    // Si trop peu de points, élargir vers la droite
-    if (points.length < 20 && (expr.contains('ln') || expr.contains('log'))) {
-      range = (range.$1, range.$2 + 20);
-      points = _sample(expr, range.$1, range.$2, 400);
-    }
-
-    final domain = _estimateDomain(expr, points);
-    final period = _detectPeriod(expr);
-    final extrema = _findExtrema(points);
-    final asymptotes = _findAsymptotes(expr, points, range.$1, range.$2);
-    final variation = _buildVariationTable(points);
-    final symmetry = _detectSymmetry(expr, points);
-    final explanations = _buildExplanations(expression, domain, period, extrema, asymptotes, symmetry);
-
+  FunctionStudyResult analyze(
+    String expression, {
+    double xMin = -10,
+    double xMax = 10,
+  }) {
+    final normalized = _engine.normalize(expression);
+    final derivative =
+        _engine.derivative(expression) ?? 'Non calculable automatiquement';
+    final points = _graph.evaluateFunction(expression, xMin, xMax, 600);
+    final domain = _domain(normalized);
+    final extrema = _extrema(derivative, points);
+    final asymptotes = _asymptotes(normalized, xMin, xMax);
+    final limits = _limits(normalized, xMin, xMax, asymptotes);
+    final period = _period(normalized);
+    final symmetry = _symmetry(normalized);
+    final variation = _variation(derivative, points);
+    final explanations = _explanations(
+      expression,
+      domain,
+      derivative,
+      extrema,
+      limits,
+      asymptotes,
+      period,
+      symmetry,
+    );
     return FunctionStudyResult(
       expression: expression,
       domain: domain,
+      derivative: derivative,
+      limits: limits,
       period: period,
       extrema: extrema,
       asymptotes: asymptotes,
@@ -62,229 +79,178 @@ class FunctionAnalysisService {
     );
   }
 
-  String _normalize(String e) {
-    return e
-        .replaceAll('×', '*')
-        .replaceAll('÷', '/')
-        .replaceAll('−', '-')
-        .replaceAll('π', 'pi')
-        .replaceAll('√', 'sqrt')
-        .replaceAll('²', '^2')
-        .replaceAll('³', '^3')
-        .replaceAll(' ', '');
+  String _domain(String expr) {
+    final log = RegExp(r'(?:log)\(([-+]?\d*\.?\d*)\*?x(?:([-+]\d*\.?\d+))?\)')
+        .firstMatch(expr);
+    if (log != null) {
+      final a = _coefficient(log.group(1));
+      final b = double.tryParse(log.group(2) ?? '0') ?? 0;
+      if (a > 0)
+        return 'D = ]${_fmt(-b / a)} ; +∞[ car ${_fmt(a)}x ${b >= 0 ? '+' : '−'} ${_fmt(b.abs())} > 0.';
+      if (a < 0)
+        return 'D = ]−∞ ; ${_fmt(-b / a)}[ car ${_fmt(a)}x ${b >= 0 ? '+' : '−'} ${_fmt(b.abs())} > 0.';
+    }
+    if (RegExp(r'log\(x\)').hasMatch(expr)) return 'D = ]0 ; +∞[ car x > 0.';
+    final sqrt = RegExp(r'sqrt\(([-+]?\d*\.?\d*)\*?x(?:([-+]\d*\.?\d+))?\)')
+        .firstMatch(expr);
+    if (sqrt != null) {
+      final a = _coefficient(sqrt.group(1));
+      final b = double.tryParse(sqrt.group(2) ?? '0') ?? 0;
+      return a >= 0
+          ? 'D = [${_fmt(-b / a)} ; +∞[ car ${_fmt(a)}x + ${_fmt(b)} ≥ 0.'
+          : 'D = ]−∞ ; ${_fmt(-b / a)}] car ${_fmt(a)}x + ${_fmt(b)} ≥ 0.';
+    }
+    if (expr.contains('/'))
+      return 'D = R privé des zéros du dénominateur (à déterminer selon l’expression).';
+    return 'D = R (aucune contrainte réelle détectée).';
   }
 
-  /// Suggère un intervalle adapté (surtout pour ln/log)
-  (double, double) _suggestRange(String expr, double xMin, double xMax) {
-    final lower = expr.toLowerCase();
-    if (lower.contains('ln') || lower.contains('log')) {
-      // Chercher pattern ln(ax+b) ou log(ax+b)
-      final match = RegExp(r'(?:ln|log)\s*\(\s*([+-]?\d*\.?\d*)\s*\*?\s*x\s*([+-]\s*\d*\.?\d*)?\s*\)').firstMatch(expr);
-      if (match != null) {
-        final aStr = match.group(1);
-        final bStr = match.group(2)?.replaceAll(' ', '') ?? '0';
-        final a = (aStr == null || aStr.isEmpty || aStr == '+') ? 1.0 : (aStr == '-' ? -1.0 : double.tryParse(aStr) ?? 1.0);
-        final b = double.tryParse(bStr) ?? 0.0;
-        // ax + b > 0  =>  x > -b/a  (si a > 0)
-        if (a > 0) {
-          final bound = -b / a;
-          return (bound + 0.01, math.max(xMax, bound + 10));
-        } else if (a < 0) {
-          final bound = -b / a;
-          return (math.min(xMin, bound - 10), bound - 0.01);
-        }
-      }
-      // ln(x) simple
-      if (RegExp(r'(?:ln|log)\s*\(\s*x\s*\)').hasMatch(expr)) {
-        return (0.01, math.max(xMax, 10));
-      }
-    }
-    return (xMin, xMax);
+  double _coefficient(String? value) {
+    if (value == null || value.isEmpty || value == '+') return 1;
+    if (value == '-') return -1;
+    return double.tryParse(value) ?? 1;
   }
 
-  List<MapEntry<double, double>> _sample(String expr, double xMin, double xMax, int n) {
-    final result = <MapEntry<double, double>>[];
-    try {
-      final exp = _parser.parse(expr);
-      final ctx = ContextModel();
-      final step = (xMax - xMin) / (n - 1);
-      for (int i = 0; i < n; i++) {
-        final x = xMin + i * step;
-        try {
-          ctx.bindVariableName('x', Number(x));
-          final y = exp.evaluate(EvaluationType.REAL, ctx);
-          if (y is num && y.isFinite) {
-            result.add(MapEntry(x, y.toDouble()));
-          }
-        } catch (_) {}
-      }
-    } catch (_) {}
-    return result;
-  }
-
-  String _estimateDomain(String expr, List<MapEntry<double, double>> points) {
-    final lower = expr.toLowerCase();
-
-    // ln(ax+b)
-    final lnMatch = RegExp(r'(?:ln|log)\s*\(\s*([+-]?\d*\.?\d*)\s*\*?\s*x\s*([+-]\s*\d*\.?\d*)?\s*\)').firstMatch(expr);
-    if (lnMatch != null) {
-      final aStr = lnMatch.group(1);
-      final bStr = lnMatch.group(2)?.replaceAll(' ', '') ?? '0';
-      final a = (aStr == null || aStr.isEmpty || aStr == '+') ? 1.0 : (aStr == '-' ? -1.0 : double.tryParse(aStr) ?? 1.0);
-      final b = double.tryParse(bStr) ?? 0.0;
-      if (a > 0) {
-        final bound = -b / a;
-        return 'x > ${bound.toStringAsFixed(2)}   (car  ${a == 1 ? '' : a.toStringAsFixed(0)}x ${b >= 0 ? '+' : ''}${b.toStringAsFixed(2)} > 0)';
-      } else if (a < 0) {
-        final bound = -b / a;
-        return 'x < ${bound.toStringAsFixed(2)}';
+  List<String> _extrema(
+    String derivative,
+    List<MapEntry<double, double>> points,
+  ) {
+    if (points.length < 3 || derivative.startsWith('Non'))
+      return ['Racines de f′ non déterminées automatiquement.'];
+    final result = <String>[];
+    double? lastRoot;
+    for (var i = 1; i < points.length; i++) {
+      final a = points[i - 1], b = points[i];
+      final da = _engine.evaluate(derivative, a.key),
+          db = _engine.evaluate(derivative, b.key);
+      if (da == null || db == null || !da.isFinite || !db.isFinite) continue;
+      if (da == 0 || da * db < 0) {
+        final root = da == 0 ? a.key : (a.key + b.key) / 2;
+        if (lastRoot != null && (root - lastRoot).abs() < 0.08) continue;
+        final kind = da > 0 && db < 0 ? 'Maximum local' : 'Minimum local';
+        result.add('$kind : f′(${_fmt(root)}) = 0 (changement de signe).');
+        lastRoot = root;
+        if (result.length >= 8) break;
       }
     }
-    if (RegExp(r'(?:ln|log)\s*\(\s*x\s*\)').hasMatch(lower)) {
-      return 'x > 0';
-    }
-    if (lower.contains('sqrt')) {
-      return 'Domaine restreint (expression sous racine ≥ 0)';
-    }
-    if (expr.contains('/')) {
-      return 'R privé des racines du dénominateur';
-    }
-    if (points.length > 50) return 'R (ou large intervalle testé)';
-    return 'Domaine partiel sur l intervalle etudie';
+    return result.isEmpty
+        ? ['Aucune racine de f′ détectée sur l’intervalle étudié.']
+        : result;
   }
 
-  String _detectPeriod(String expr) {
-    final lower = expr.toLowerCase();
-    if (lower.contains('sin') || lower.contains('cos') || lower.contains('tan')) {
-      if (lower.contains('sin(x)') || lower.contains('cos(x)')) return '2π';
-      if (lower.contains('tan(x)')) return 'π';
-      return 'Periodique (trigonometrique)';
-    }
-    return 'Non periodique';
+  List<String> _asymptotes(String expr, double xMin, double xMax) {
+    final result = <String>[];
+    final log = RegExp(r'(?:log)\(([-+]?\d*\.?\d*)\*?x(?:([-+]\d*\.?\d+))?\)')
+        .firstMatch(expr);
+    if (log != null)
+      result.add(
+        'Verticale : x = ${_fmt(-(double.tryParse(log.group(2) ?? '0') ?? 0) / _coefficient(log.group(1)))}.',
+      );
+    if (RegExp(r'log\(x\)').hasMatch(expr)) result.add('Verticale : x = 0.');
+    if (expr.contains('/'))
+      result.add('Verticales possibles aux zéros du dénominateur.');
+    final right = _engine.evaluate(expr, xMax),
+        left = _engine.evaluate(expr, xMin);
+    if (right != null && (right - xMax).abs() < 0.2)
+      result.add('Oblique possible à droite : y ≈ x.');
+    else if (right != null && right.abs() < 0.1)
+      result.add('Horizontale à droite : y = 0.');
+    if (left != null && left.abs() < 0.1)
+      result.add('Horizontale à gauche : y = 0.');
+    return result.isEmpty ? ['Aucune asymptote élémentaire détectée.'] : result;
   }
 
-  List<String> _findExtrema(List<MapEntry<double, double>> points) {
-    if (points.length < 5) return ['Aucun extremum detecte sur l intervalle'];
-    final list = <String>[];
-    for (int i = 2; i < points.length - 2; i++) {
-      final prev = points[i - 1].value;
-      final curr = points[i].value;
-      final next = points[i + 1].value;
-      if (curr > prev && curr > next) {
-        list.add('Maximum local ≈ (${points[i].key.toStringAsFixed(2)} ; ${curr.toStringAsFixed(2)})');
-      } else if (curr < prev && curr < next) {
-        list.add('Minimum local ≈ (${points[i].key.toStringAsFixed(2)} ; ${curr.toStringAsFixed(2)})');
-      }
-    }
-    if (list.isEmpty) return ['Aucun extremum local evident (fonction monotone possible)'];
-    return list.take(6).toList();
+  String _limits(
+    String expr,
+    double xMin,
+    double xMax,
+    List<String> asymptotes,
+  ) {
+    final l = _engine.evaluate(expr, xMin), r = _engine.evaluate(expr, xMax);
+    String value(double? v) =>
+        v == null ? 'non définie' : (v.abs() > 1e6 ? '±∞' : _fmt(v));
+    return 'Limite à gauche de l’intervalle : ${value(l)} ; limite à droite : ${value(r)}.\nLes limites aux bornes interdites sont indiquées par les asymptotes lorsqu’elles existent.';
   }
 
-  List<String> _findAsymptotes(String expr, List<MapEntry<double, double>> points, double xMin, double xMax) {
-    final list = <String>[];
-    final lower = expr.toLowerCase();
-
-    // Asymptote verticale pour ln(ax+b)
-    final lnMatch = RegExp(r'(?:ln|log)\s*\(\s*([+-]?\d*\.?\d*)\s*\*?\s*x\s*([+-]\s*\d*\.?\d*)?\s*\)').firstMatch(expr);
-    if (lnMatch != null) {
-      final aStr = lnMatch.group(1);
-      final bStr = lnMatch.group(2)?.replaceAll(' ', '') ?? '0';
-      final a = (aStr == null || aStr.isEmpty || aStr == '+') ? 1.0 : (aStr == '-' ? -1.0 : double.tryParse(aStr) ?? 1.0);
-      final b = double.tryParse(bStr) ?? 0.0;
-      if (a != 0) {
-        final bound = -b / a;
-        list.add('Asymptote verticale : x = ${bound.toStringAsFixed(2)}');
-      }
-    }
-    if (RegExp(r'(?:ln|log)\s*\(\s*x\s*\)').hasMatch(lower)) {
-      list.add('Asymptote verticale : x = 0');
-    }
-
-    if (expr.contains('/')) {
-      list.add('Asymptotes verticales possibles aux racines du denominateur');
-    }
-
-    // Comportement en ±∞
-    if (points.length >= 2) {
-      final last = points.last;
-      if (last.value > 5) {
-        list.add('Quand x → +∞, f(x) → +∞ (ou croît fortement)');
-      } else if (last.value < -5) {
-        list.add('Quand x → +∞, f(x) → −∞');
-      }
-    }
-
-    if (list.isEmpty) list.add('Pas d asymptote evidente detectee numeriquement');
-    return list;
+  String _period(String expr) {
+    if (expr.contains('tan(x)')) return 'π (tangente).';
+    if (expr.contains('sin(x)') || expr.contains('cos(x)')) return '2π.';
+    return 'Non périodique détectée.';
   }
 
-  String _buildVariationTable(List<MapEntry<double, double>> points) {
-    if (points.length < 4) return 'Donnees insuffisantes (fonction peu definie sur l intervalle)';
-    final buffer = StringBuffer();
-    buffer.writeln('x        | f(x) approx | Sens');
-    buffer.writeln('---------|-------------|-----');
-    final step = (points.length / 10).ceil().clamp(1, 50);
-    for (int i = 0; i < points.length; i += step) {
+  String _symmetry(String expr) {
+    final even = _compare(expr, expr.replaceAll('x', '(-x)'));
+    final odd = _compare(expr, '-(${expr.replaceAll('x', '(-x)')})');
+    if (even) return 'Paire : axe de symétrie (Oy).';
+    if (odd) return 'Impaire : centre de symétrie (O).';
+    return 'Aucune parité détectée automatiquement.';
+  }
+
+  bool _compare(String a, String b) {
+    for (final x in [-3.0, -1.2, 0.7, 2.5]) {
+      final av = _engine.evaluate(a, x), bv = _engine.evaluate(b, x);
+      if (av == null || bv == null || (av - bv).abs() > 1e-5) return false;
+    }
+    return true;
+  }
+
+  String _variation(String derivative, List<MapEntry<double, double>> points) {
+    if (points.length < 2)
+      return 'Données insuffisantes pour le tableau de variation.';
+    final rows = <String>[
+      'x        | signe de f′ | variation',
+      '---------|-------------|-----------',
+    ];
+    final step = math.max(1, (points.length / 10).round());
+    for (var i = 0; i < points.length; i += step) {
       final p = points[i];
-      String sens = '—';
-      if (i > 0) {
-        final diff = p.value - points[i - 1].value;
-        if (diff > 0.001) {
-          sens = 'croissante';
-        } else if (diff < -0.001) sens = 'decroissante';
-        else {
-          sens = 'stable';
-        }
-      }
-      buffer.writeln('${p.key.toStringAsFixed(2).padLeft(8)} | ${p.value.toStringAsFixed(3).padLeft(11)} | $sens');
+      final d = _engine.evaluate(derivative, p.key);
+      final sign = d == null
+          ? 'indéfini'
+          : d.abs() < 1e-5
+              ? '0'
+              : d > 0
+                  ? '+'
+                  : '−';
+      final direction = sign == '+'
+          ? 'croissante'
+          : sign == '−'
+              ? 'décroissante'
+              : 'à étudier';
+      rows.add('${_fmt(p.key).padLeft(8)} | ${sign.padLeft(11)} | $direction');
     }
-    return buffer.toString();
+    return rows.join('\n');
   }
 
-  String _detectSymmetry(String expr, List<MapEntry<double, double>> points) {
-    final lower = expr.toLowerCase();
-    if (lower.contains('ln') || lower.contains('log')) {
-      return 'Aucune symetrie evidente (fonction logarithme)';
-    }
-    if (lower.contains('x^2') || lower.contains('x²')) {
-      return 'Parite paire possible → axe de symetrie (Oy)';
-    }
-    if (lower.contains('x^3') || lower.contains('x³')) {
-      return 'Parite impaire possible → centre de symetrie (origine)';
-    }
-    return 'Aucune symetrie evidente detectee';
-  }
+  String _explanations(
+    String expression,
+    String domain,
+    String derivative,
+    List<String> extrema,
+    String limits,
+    List<String> asymptotes,
+    String period,
+    String symmetry,
+  ) =>
+      '''Méthode hors-ligne :
+1. Normalisation : les multiplications implicites sont explicitées (par exemple 2x devient 2*x) et ln est traité comme log naturel.
+2. Domaine : on impose les contraintes réelles des logarithmes, racines et dénominateurs.
+3. Dérivée : application récursive des règles de somme, produit, quotient, puissance et fonctions usuelles.
 
-  String _buildExplanations(String expr, String domain, String period, List<String> extrema,
-      List<String> asymptotes, String symmetry) {
-    final b = StringBuffer();
-    b.writeln('=== Comment lire cette etude ===');
-    b.writeln();
-    b.writeln('1. Domaine de definition');
-    b.writeln('   Ensemble des x pour lesquels f(x) existe.');
-    b.writeln('   Ici : $domain');
-    b.writeln();
-    b.writeln('2. Periodicite');
-    b.writeln('   Une fonction est periodique de periode T si f(x+T) = f(x).');
-    b.writeln('   Ici : $period');
-    b.writeln();
-    b.writeln('3. Extremums');
-    b.writeln('   Points ou la derivee s annule ou change de signe.');
-    for (final e in extrema) {
-      b.writeln('   - $e');
-    }
-    b.writeln();
-    b.writeln('4. Asymptotes');
-    b.writeln('   Droites dont la courbe se rapproche a l infini.');
-    for (final a in asymptotes) {
-      b.writeln('   - $a');
-    }
-    b.writeln();
-    b.writeln('5. Symetrie');
-    b.writeln('   $symmetry');
-    b.writeln();
-    b.writeln('Note : analyse principalement numerique.');
-    b.writeln('Pour une etude algebrique complete, calculer f (x) a la main.');
-    return b.toString();
-  }
+Fonction : f(x) = $expression
+Domaine : $domain
+Dérivée : f′(x) = $derivative
+Racines de f′ et extremums : ${extrema.join(' ; ')}
+Limites : $limits
+Asymptotes : ${asymptotes.join(' ; ')}
+Variation : le signe de f′ détermine les intervalles croissants et décroissants.
+Périodicité : $period
+Parité : $symmetry''';
+
+  String _fmt(double value) => value.abs() < 1e-9
+      ? '0'
+      : value
+          .toStringAsFixed(3)
+          .replaceFirst(RegExp(r'0+$'), '')
+          .replaceFirst(RegExp(r'\.$'), '');
 }

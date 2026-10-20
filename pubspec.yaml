@@ -1,7 +1,7 @@
 name: calc_for_all
-description: Calc For All - Calculatrice scientifique avancée avec graphiques et nombres complexes.
+description: Calc For All - Calculatrice scientifique avancée avec graphiques, nombres complexes et étude de fonction.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -14,6 +14,11 @@ dependencies:
   shared_preferences: ^2.3.2
   math_expressions: ^2.6.0
   fl_chart: ^0.69.0
+  flutter_animate: ^4.5.0
+  pdf: ^3.11.1
+  printing: ^5.13.3
+  path_provider: ^2.1.4
+  share_plus: ^10.0.2
 
 dev_dependencies:
   flutter_test:
@@ -22,3 +27,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/

@@ -19,17 +19,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingPage(
       icon: Icons.calculate_rounded,
       title: 'Calculatrice scientifique',
-      description: 'Toutes les fonctions classiques : +, −, ×, ÷, √, sin, cos, log, π…',
+      description: 'Toutes les fonctions classiques + fractions.',
     ),
     _OnboardingPage(
       icon: Icons.show_chart_rounded,
-      title: 'Tracé de courbes',
-      description: 'Visualise n’importe quelle fonction mathématique en temps réel.',
+      title: 'Étude de fonction',
+      description: 'Domaine, dérivée, tableau de variation, asymptotes… et export PDF.',
     ),
     _OnboardingPage(
-      icon: Icons.functions_rounded,
-      title: 'Nombres complexes',
-      description: 'Addition, multiplication, module, argument… tout est supporté.',
+      icon: Icons.school_rounded,
+      title: 'Tout pour les maths',
+      description: 'Probabilités, statistiques, convertisseur, complexes, dérivées…',
     ),
   ];
 
@@ -44,7 +44,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await storage.init();
     final done = await storage.isOnboardingDone();
     if (done && mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.calculator);
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
     }
   }
 
@@ -52,7 +52,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final storage = context.read<LocalStorage>();
     await storage.setOnboardingDone(true);
     if (mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.calculator);
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
     }
   }
 
@@ -78,9 +78,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         const SizedBox(height: 40),
                         Text(
                           page.title,
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
@@ -95,7 +93,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
-            // Indicateurs
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -105,9 +102,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: _currentPage == i ? 24 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: _currentPage == i
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade400,
+                    color: _currentPage == i ? Theme.of(context).primaryColor : Colors.grey.shade400,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -122,10 +117,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_currentPage < _pages.length - 1) {
-                      _controller.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
+                      _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
                     } else {
                       _finish();
                     }
@@ -148,9 +140,5 @@ class _OnboardingPage {
   final IconData icon;
   final String title;
   final String description;
-  _OnboardingPage({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
+  _OnboardingPage({required this.icon, required this.title, required this.description});
 }

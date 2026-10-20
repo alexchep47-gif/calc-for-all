@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/routes/app_routes.dart';
 import '../../data/services/calculator_service.dart';
 import '../../data/storage/local_storage.dart';
 import '../../widgets/custom_button.dart';
 
-/// Écran principal de la calculatrice scientifique
+/// Écran principal de la calculatrice scientifique (avec fractions)
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
 
@@ -20,8 +22,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   bool _justCalculated = false;
 
   void _onButtonPressed(String value) {
+    HapticFeedback.lightImpact();
     setState(() {
-      if (_justCalculated && !_isOperator(value) && value != '=' && value != '⌫') {
+      if (_justCalculated && !_isOperator(value) && value != '=' && value != '⌫' && value != 'a/b') {
         _expression = '';
         _justCalculated = false;
       }
@@ -44,14 +47,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             context.read<LocalStorage>().addToHistory(_expression, res);
           }
           break;
-        // Fonctions scientifiques : on insère le nom + parenthèse ouvrante
+        case 'a/b':
+          // Insère une fraction simple : (numerator)/(denominator)
+          _expression += '/';
+          break;
         case 'sin':
         case 'cos':
         case 'tan':
         case 'log':
         case 'ln':
+          _expression += '$value(';
+          break;
         case '√':
-          _expression += value == '√' ? 'sqrt(' : '$value(';
+          _expression += 'sqrt(';
           break;
         case 'π':
           _expression += 'π';
@@ -66,7 +74,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     });
   }
 
-  bool _isOperator(String v) => ['+', '−', '×', '÷', '^', '%'].contains(v);
+  bool _isOperator(String v) => ['+', '−', '×', '÷', '^', '%', '/'].contains(v);
 
   @override
   Widget build(BuildContext context) {
@@ -77,22 +85,22 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         title: const Text('Calc For All'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.show_chart),
-            tooltip: 'Graphiques',
+            icon: const Icon(Icons.show_chart_rounded),
+            tooltip: 'Étude de fonction',
             onPressed: () => Navigator.pushNamed(context, AppRoutes.graph),
           ),
           IconButton(
-            icon: const Icon(Icons.functions),
+            icon: const Icon(Icons.functions_rounded),
             tooltip: 'Complexes',
             onPressed: () => Navigator.pushNamed(context, AppRoutes.complex),
           ),
           IconButton(
-            icon: const Icon(Icons.history),
+            icon: const Icon(Icons.history_rounded),
             tooltip: 'Historique',
             onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
           ),
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_rounded),
             tooltip: 'Réglages',
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
           ),
@@ -105,8 +113,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             flex: 2,
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -116,41 +134,36 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     reverse: true,
                     child: Text(
                       _expression.isEmpty ? '0' : _expression,
-                      style: TextStyle(
-                        fontSize: 26,
-                        color: Colors.grey.shade600,
-                      ),
+                      style: TextStyle(fontSize: 24, color: Colors.grey.shade600),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     _result,
-                    style: const TextStyle(
-                      fontSize: 42,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w700),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                  ),
+                  ).animate(target: _justCalculated ? 1 : 0).scale(begin: const Offset(1, 1), end: const Offset(1.05, 1.05)).then().scale(begin: const Offset(1.05, 1.05), end: const Offset(1, 1)),
                 ],
               ),
             ),
           ),
+
           // Clavier
           Expanded(
             flex: 5,
-            child: Container(
-              padding: const EdgeInsets.all(6),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
               child: Column(
                 children: [
-                  _buildRow(['C', '⌫', '%', '÷']),
+                  _buildRow(['C', '⌫', 'a/b', '÷']),
                   _buildRow(['7', '8', '9', '×']),
                   _buildRow(['4', '5', '6', '−']),
                   _buildRow(['1', '2', '3', '+']),
                   _buildRow(['0', '.', 'π', '=']),
                   _buildRow(['sin', 'cos', 'tan', '√']),
                   _buildRow(['log', 'ln', '^', '(']),
-                  _buildRow([')', 'e', '!', '']),
+                  _buildRow([')', 'e', '!', '%']),
                 ],
               ),
             ),
@@ -164,11 +177,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return Expanded(
       child: Row(
         children: buttons.map((b) {
-          if (b.isEmpty) return const Expanded(child: SizedBox());
-          final isOp = _isOperator(b) || b == '=' || b == 'C' || b == '⌫';
+          final isOp = _isOperator(b) || b == '=' || b == 'C' || b == '⌫' || b == 'a/b';
           return Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(3),
+              padding: const EdgeInsets.all(3.5),
               child: CustomButton(
                 label: b,
                 isOperator: isOp,

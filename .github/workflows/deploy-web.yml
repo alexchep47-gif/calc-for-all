@@ -21,6 +21,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -32,7 +36,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Web release
-        run: flutter build web --release --base-href "/calc-for-all/"
+        run: flutter build web --release --base-href "${{ steps.pages.outputs.base_path }}/"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

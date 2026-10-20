@@ -21,6 +21,18 @@ Calculatrice Android Flutter avancée : scientifique + graphiques + nombres comp
 4. Télécharge l’artefact `calc-for-all-apk`
 5. Installe l’APK
 
+## Preview Web
+
+Chaque push sur `main` compile automatiquement la version Flutter Web et la
+publie sur GitHub Pages via le workflow **Deploy Flutter Web Preview**.
+
+Après la première exécution réussie, la preview est accessible à l’adresse :
+
+https://alexchep47-gif.github.io/calc-for-all/
+
+Si GitHub Pages n’est pas encore activé, ouvre **Settings → Pages**, sélectionne
+**GitHub Actions** comme source de déploiement, puis relance le workflow.
+
 ## Structure
 
 ```

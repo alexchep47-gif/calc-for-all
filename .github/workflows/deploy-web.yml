@@ -36,7 +36,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Web release
-        run: flutter build web --release --base-href "${{ steps.pages.outputs.base_path }}/"
+        run: flutter build web --release --web-renderer html --pwa-strategy none --base-href "${{ steps.pages.outputs.base_path }}/"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

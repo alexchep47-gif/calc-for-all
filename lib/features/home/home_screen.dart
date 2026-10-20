@@ -15,6 +15,7 @@ class HomeScreen extends StatelessWidget {
       _Module('Cercle trigonométrique', 'Interactif cos / sin / tan', Icons.radar_rounded, const Color(0xFF00838F), AppRoutes.unitCircle),
       _Module('Suites numériques', 'Arithmétiques & géométriques', Icons.format_list_numbered_rounded, const Color(0xFF5D4037), AppRoutes.sequences),
       _Module('Géométrie', 'Pythagore, Thalès, aires, volumes', Icons.pentagon_rounded, const Color(0xFF37474F), AppRoutes.geometry),
+      _Module('Exercices', 'Quiz avec correction détaillée', Icons.quiz_rounded, const Color(0xFFC62828), AppRoutes.exercises),
       _Module('Dérivée & Intégrale', 'Calcul + explications', Icons.functions_rounded, const Color(0xFF4527A0), AppRoutes.derivative),
       _Module('Probabilités', 'Permutations, arrangements, combinaisons', Icons.casino_rounded, const Color(0xFF00695C), AppRoutes.probability),
       _Module('Statistiques', 'Série de données + indicateurs', Icons.bar_chart_rounded, const Color(0xFFEF6C00), AppRoutes.statistics),
@@ -41,7 +42,7 @@ class HomeScreen extends StatelessWidget {
           ...modules.asMap().entries.map((entry) {
             final i = entry.key;
             final m = entry.value;
-            return _ModuleCard(module: m).animate().fadeIn(delay: (40 * i).ms, duration: 280.ms).slideY(begin: 0.08, end: 0);
+            return _ModuleCard(module: m).animate().fadeIn(delay: (35 * i).ms, duration: 280.ms).slideY(begin: 0.08, end: 0);
           }),
         ],
       ),

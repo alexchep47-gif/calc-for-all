@@ -10,8 +10,8 @@ import '../../features/probability/probability_screen.dart';
 import '../../features/converter/converter_screen.dart';
 import '../../features/statistics/statistics_screen.dart';
 import '../../features/derivative/derivative_screen.dart';
+import '../../features/solver/solver_screen.dart';
 
-/// Routes de l'application
 class AppRoutes {
   static const String onboarding = '/';
   static const String home = '/home';
@@ -24,6 +24,7 @@ class AppRoutes {
   static const String converter = '/converter';
   static const String statistics = '/statistics';
   static const String derivative = '/derivative';
+  static const String solver = '/solver';
 
   static Map<String, WidgetBuilder> get routes => {
         onboarding: (context) => const OnboardingScreen(),
@@ -37,5 +38,6 @@ class AppRoutes {
         converter: (context) => const ConverterScreen(),
         statistics: (context) => const StatisticsScreen(),
         derivative: (context) => const DerivativeScreen(),
+        solver: (context) => const SolverScreen(),
       };
 }

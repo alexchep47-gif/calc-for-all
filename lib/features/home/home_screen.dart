@@ -2,69 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/routes/app_routes.dart';
 
-/// Écran d'accueil avec accès à tous les modules
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final modules = [
-      _Module(
-        title: 'Calculatrice',
-        subtitle: 'Scientifique + fractions',
-        icon: Icons.calculate_rounded,
-        color: const Color(0xFF1565C0),
-        route: AppRoutes.calculator,
-      ),
-      _Module(
-        title: 'Étude de fonction',
-        subtitle: 'Les 8 étapes + graphique + PDF',
-        icon: Icons.show_chart_rounded,
-        color: const Color(0xFF2E7D32),
-        route: AppRoutes.graph,
-      ),
-      _Module(
-        title: 'Dérivée & Intégrale',
-        subtitle: 'Calcul + explications',
-        icon: Icons.functions_rounded,
-        color: const Color(0xFF6A1B9A),
-        route: AppRoutes.derivative,
-      ),
-      _Module(
-        title: 'Probabilités',
-        subtitle: 'Permutations, arrangements, combinaisons',
-        icon: Icons.casino_rounded,
-        color: const Color(0xFF00838F),
-        route: AppRoutes.probability,
-      ),
-      _Module(
-        title: 'Statistiques',
-        subtitle: 'Tableau de données + indicateurs',
-        icon: Icons.bar_chart_rounded,
-        color: const Color(0xFFEF6C00),
-        route: AppRoutes.statistics,
-      ),
-      _Module(
-        title: 'Nombres complexes',
-        subtitle: 'Opérations + forme polaire',
-        icon: Icons.blur_on_rounded,
-        color: const Color(0xFFAD1457),
-        route: AppRoutes.complex,
-      ),
-      _Module(
-        title: 'Convertisseur',
-        subtitle: 'Devises, longueurs, masses…',
-        icon: Icons.swap_horiz_rounded,
-        color: const Color(0xFF455A64),
-        route: AppRoutes.converter,
-      ),
-      _Module(
-        title: 'Historique',
-        subtitle: 'Tes derniers calculs',
-        icon: Icons.history_rounded,
-        color: const Color(0xFF5D4037),
-        route: AppRoutes.history,
-      ),
+      _Module('Calculatrice', 'Scientifique + fractions', Icons.calculate_rounded, const Color(0xFF1565C0), AppRoutes.calculator),
+      _Module('Étude de fonction', '8 étapes + graphique + PDF', Icons.show_chart_rounded, const Color(0xFF2E7D32), AppRoutes.graph),
+      _Module('Solveur d’équations', 'Polynômes de degré n', Icons.architecture_rounded, const Color(0xFF6A1B9A), AppRoutes.solver),
+      _Module('Dérivée & Intégrale', 'Calcul + explications', Icons.functions_rounded, const Color(0xFF4527A0), AppRoutes.derivative),
+      _Module('Probabilités', 'Permutations, arrangements, combinaisons', Icons.casino_rounded, const Color(0xFF00838F), AppRoutes.probability),
+      _Module('Statistiques', 'Tableau de données + indicateurs', Icons.bar_chart_rounded, const Color(0xFFEF6C00), AppRoutes.statistics),
+      _Module('Nombres complexes', 'Opérations + forme polaire', Icons.blur_on_rounded, const Color(0xFFAD1457), AppRoutes.complex),
+      _Module('Convertisseur', 'Devises, longueurs, masses…', Icons.swap_horiz_rounded, const Color(0xFF455A64), AppRoutes.converter),
+      _Module('Historique', 'Tes derniers calculs', Icons.history_rounded, const Color(0xFF5D4037), AppRoutes.history),
     ];
 
     return Scaffold(
@@ -80,20 +32,12 @@ class HomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
         children: [
-          Text(
-            'Choisis un module',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
-          ).animate().fadeIn(),
+          Text('Choisis un module', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600)).animate().fadeIn(),
           const SizedBox(height: 12),
           ...modules.asMap().entries.map((entry) {
             final i = entry.key;
             final m = entry.value;
-            return _ModuleCard(module: m)
-                .animate()
-                .fadeIn(delay: (80 * i).ms, duration: 350.ms)
-                .slideY(begin: 0.15, end: 0);
+            return _ModuleCard(module: m).animate().fadeIn(delay: (60 * i).ms, duration: 350.ms).slideY(begin: 0.12, end: 0);
           }),
         ],
       ),
@@ -102,24 +46,15 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _Module {
-  final String title;
-  final String subtitle;
+  final String title, subtitle;
   final IconData icon;
   final Color color;
   final String route;
-
-  _Module({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.route,
-  });
+  _Module(this.title, this.subtitle, this.icon, this.color, this.route);
 }
 
 class _ModuleCard extends StatelessWidget {
   final _Module module;
-
   const _ModuleCard({required this.module});
 
   @override
@@ -149,21 +84,9 @@ class _ModuleCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      module.title,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(module.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    Text(
-                      module.subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
+                    Text(module.subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                   ],
                 ),
               ),

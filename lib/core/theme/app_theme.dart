@@ -18,11 +18,10 @@ class ThemeProvider extends ChangeNotifier {
   }
 }
 
-/// Thèmes de l'application
+/// Thèmes modernes de l'application
 class AppTheme {
-  // Couleurs principales
-  static const Color primaryColor = Color(0xFF1E88E5); // Bleu moderne
-  static const Color accentColor = Color(0xFF00ACC1);  // Cyan
+  static const Color primaryColor = Color(0xFF1565C0); // Bleu profond
+  static const Color accentColor = Color(0xFF00BCD4);  // Cyan vif
   static const Color errorColor = Color(0xFFE53935);
 
   static ThemeData get lightTheme {
@@ -36,22 +35,35 @@ class AppTheme {
         primary: primaryColor,
         secondary: accentColor,
       ),
-      scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+      scaffoldBackgroundColor: const Color(0xFFF0F4F8),
       appBarTheme: const AppBarTheme(
         elevation: 0,
         centerTitle: true,
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
+        titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       cardTheme: CardTheme(
-        elevation: 2,
+        elevation: 1.5,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        filled: true,
+        fillColor: Colors.white,
       ),
     );
   }
@@ -64,25 +76,37 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         brightness: Brightness.dark,
-        primary: primaryColor,
+        primary: const Color(0xFF42A5F5),
         secondary: accentColor,
       ),
-      scaffoldBackgroundColor: const Color(0xFF121212),
+      scaffoldBackgroundColor: const Color(0xFF0D0D0D),
       appBarTheme: const AppBarTheme(
         elevation: 0,
         centerTitle: true,
-        backgroundColor: Color(0xFF1E1E1E),
+        backgroundColor: Color(0xFF1A1A1A),
         foregroundColor: Colors.white,
+        titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       cardTheme: CardTheme(
-        elevation: 2,
+        elevation: 1.5,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        color: const Color(0xFF1E1E1E),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        filled: true,
+        fillColor: const Color(0xFF1E1E1E),
       ),
     );
   }

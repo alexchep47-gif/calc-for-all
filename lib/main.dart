@@ -41,6 +41,14 @@ class CalcForAllApp extends StatelessWidget {
                 themeProvider.isOled ? AppTheme.oledTheme : AppTheme.darkTheme,
             themeMode:
                 themeProvider.isOled ? ThemeMode.dark : themeProvider.themeMode,
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(themeProvider.fontScale),
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
             initialRoute: AppRoutes.onboarding,
             routes: AppRoutes.routes,
           );

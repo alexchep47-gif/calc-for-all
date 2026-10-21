@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 
-/// Gestionnaire de thème clair, sombre et OLED avec persistance locale.
+/// Gestionnaire de thème clair / sombre / OLED + taille de police.
 class ThemeProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   bool _oled = false;
+  double _fontScale = 1.0;
   bool _hasLoaded = false;
 
   ThemeMode get themeMode => _themeMode;
   bool get isOled => _oled;
+  double get fontScale => _fontScale;
   bool get hasLoaded => _hasLoaded;
 
   Future<void> load() async {
@@ -23,6 +25,7 @@ class ThemeProvider extends ChangeNotifier {
         _ => ThemeMode.system,
       };
     }
+    _fontScale = prefs.getDouble(AppConstants.keyFontScale) ?? 1.0;
     _hasLoaded = true;
     notifyListeners();
   }
@@ -42,9 +45,15 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setString(AppConstants.keyThemeMode, enabled ? 'oled' : 'dark');
     notifyListeners();
   }
+
+  Future<void> setFontScale(double scale) async {
+    _fontScale = scale.clamp(0.85, 1.35);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(AppConstants.keyFontScale, _fontScale);
+    notifyListeners();
+  }
 }
 
-/// Thèmes modernes de l'application.
 class AppTheme {
   static const Color primaryColor = Color(0xFF1565C0);
   static const Color accentColor = Color(0xFF00BCD4);
@@ -76,20 +85,22 @@ class AppTheme {
         backgroundColor: isDark ? card : primaryColor,
         foregroundColor: Colors.white,
         titleTextStyle: const TextStyle(
-            fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 2,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14))),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
       ),
       cardTheme: CardTheme(
         elevation: 1.5,

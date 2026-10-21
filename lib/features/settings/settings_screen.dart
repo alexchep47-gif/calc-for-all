@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 
-/// Écran des réglages
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -12,19 +11,18 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Réglages'),
-      ),
+      appBar: AppBar(title: const Text('Reglages')),
       body: ListView(
         children: [
           const SizedBox(height: 8),
-          // Thème
           ListTile(
             leading: const Icon(Icons.brightness_6),
-            title: const Text('Thème'),
-            subtitle: Text(themeProvider.isOled
-                ? 'OLED noir'
-                : _themeLabel(themeProvider.themeMode)),
+            title: const Text('Theme'),
+            subtitle: Text(
+              themeProvider.isOled
+                  ? 'OLED noir'
+                  : _themeLabel(themeProvider.themeMode),
+            ),
             onTap: () {
               showModalBottomSheet(
                 context: context,
@@ -50,7 +48,7 @@ class SettingsScreen extends StatelessWidget {
                           },
                         ),
                         ListTile(
-                          title: const Text('Système'),
+                          title: const Text('Systeme'),
                           leading: const Icon(Icons.settings_suggest),
                           onTap: () {
                             themeProvider.setThemeMode(ThemeMode.system);
@@ -67,16 +65,31 @@ class SettingsScreen extends StatelessWidget {
           SwitchListTile(
             secondary: const Icon(Icons.contrast_rounded),
             title: const Text('Mode OLED'),
-            subtitle:
-                const Text('Fond noir pour les écrans OLED et la batterie'),
+            subtitle: const Text('Fond noir pour ecrans OLED et batterie'),
             value: themeProvider.isOled,
             onChanged: (value) => themeProvider.setOled(value),
           ),
           const Divider(),
-          // À propos
+          ListTile(
+            leading: const Icon(Icons.format_size),
+            title: const Text('Taille de la police'),
+            subtitle: Text('${(themeProvider.fontScale * 100).round()} %'),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Slider(
+              value: themeProvider.fontScale,
+              min: 0.85,
+              max: 1.35,
+              divisions: 10,
+              label: '${(themeProvider.fontScale * 100).round()} %',
+              onChanged: (v) => themeProvider.setFontScale(v),
+            ),
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('À propos'),
+            title: const Text('A propos'),
             subtitle:
                 Text('${AppConstants.appName} v${AppConstants.appVersion}'),
             onTap: () {
@@ -92,15 +105,6 @@ class SettingsScreen extends StatelessWidget {
               );
             },
           ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Calc For All est une calculatrice hors ligne, légère et complète.\n'
-              'Fonctionnalités : calculatrice scientifique, tracé de courbes, nombres complexes.',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
         ],
       ),
     );
@@ -113,7 +117,7 @@ class SettingsScreen extends StatelessWidget {
       case ThemeMode.dark:
         return 'Sombre';
       case ThemeMode.system:
-        return 'Système';
+        return 'Systeme';
     }
   }
 }

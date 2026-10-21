@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
 
-/// Module Géométrie : Pythagore, Thalès, aires, volumes
+/// Geometrie : Pythagore, Thales, aires, volumes, vecteurs 3D
 class GeometryScreen extends StatefulWidget {
   const GeometryScreen({super.key});
 
@@ -16,11 +16,40 @@ class _GeometryScreenState extends State<GeometryScreen> {
   String _result = '';
   String _steps = '';
 
-  TextEditingController _c(String key) {
-    return _ctrls.putIfAbsent(key, () => TextEditingController());
-  }
+  TextEditingController _c(String key) =>
+      _ctrls.putIfAbsent(key, () => TextEditingController());
 
   double? _v(String key) => double.tryParse(_c(key).text.replaceAll(',', '.'));
+
+  void _loadExample() {
+    setState(() {
+      switch (_tool) {
+        case 'pythagore':
+          _c('a').text = '3';
+          _c('b').text = '4';
+          _c('c').text = '';
+          break;
+        case 'thales':
+          _c('ad').text = '2';
+          _c('ab').text = '6';
+          _c('ae').text = '3';
+          _c('ac').text = '';
+          break;
+        case 'vecteurs':
+          _c('ux').text = '1';
+          _c('uy').text = '2';
+          _c('uz').text = '3';
+          _c('vx').text = '4';
+          _c('vy').text = '5';
+          _c('vz').text = '6';
+          break;
+        default:
+          break;
+      }
+      _result = '';
+      _steps = '';
+    });
+  }
 
   void _calculate() {
     final buffer = StringBuffer();
@@ -32,34 +61,32 @@ class _GeometryScreenState extends State<GeometryScreen> {
         final c = _v('c');
         if (a != null && b != null && c == null) {
           final hyp = math.sqrt(a * a + b * b);
-          buffer.writeln('Théorème de Pythagore');
-          buffer.writeln('a² + b² = c²');
-          buffer.writeln('$a² + $b² = c²');
-          buffer.writeln('${a * a} + ${b * b} = c²');
-          buffer.writeln('${a * a + b * b} = c²');
-          buffer.writeln('c = √${a * a + b * b} = $hyp');
+          buffer.writeln('Theoreme de Pythagore');
+          buffer.writeln('a^2 + b^2 = c^2');
+          buffer.writeln('$a^2 + $b^2 = c^2');
+          buffer.writeln('c = sqrt(${a * a + b * b}) = $hyp');
           setState(() {
-            _result = 'Hypoténuse c ≈ ${hyp.toStringAsFixed(6)}';
+            _result = 'Hypotenuse c ≈ ${hyp.toStringAsFixed(6)}';
             _steps = buffer.toString();
           });
         } else if (a != null && c != null && b == null) {
           if (c <= a) {
             setState(() {
-              _result = 'Impossible (c doit être > a)';
+              _result = 'Impossible (c doit etre > a)';
               _steps = '';
             });
             return;
           }
           final side = math.sqrt(c * c - a * a);
-          buffer.writeln('b = √(c² − a²) = √(${c * c} − ${a * a}) = $side');
+          buffer.writeln('b = sqrt(c^2 - a^2) = $side');
           setState(() {
-            _result = 'Côté b ≈ ${side.toStringAsFixed(6)}';
+            _result = 'Cote b ≈ ${side.toStringAsFixed(6)}';
             _steps = buffer.toString();
           });
         } else {
           setState(() {
-            _result = 'Remplis deux valeurs (a et b, ou a et c…)';
-            _steps = 'Laisse vide la valeur que tu cherches.';
+            _result = 'Remplis deux valeurs (a et b, ou a et c)';
+            _steps = 'Laisse vide la valeur cherchee.';
           });
         }
         break;
@@ -68,20 +95,18 @@ class _GeometryScreenState extends State<GeometryScreen> {
         final ad = _v('ad');
         final ab = _v('ab');
         final ae = _v('ae');
-        final ac = _v('ac');
-        if (ad != null && ab != null && ae != null && ac == null) {
+        if (ad != null && ab != null && ae != null) {
           final result = ae * ab / ad;
-          buffer.writeln('Théorème de Thalès');
+          buffer.writeln('Theoreme de Thales');
           buffer.writeln('AD/AB = AE/AC');
-          buffer.writeln('$ad / $ab = $ae / AC');
-          buffer.writeln('AC = $ae × $ab / $ad = $result');
+          buffer.writeln('AC = $ae * $ab / $ad = $result');
           setState(() {
             _result = 'AC ≈ ${result.toStringAsFixed(6)}';
             _steps = buffer.toString();
           });
         } else {
           setState(() {
-            _result = 'Remplis AD, AB et AE (laisse AC vide)';
+            _result = 'Remplis AD, AB et AE';
             _steps = '';
           });
         }
@@ -89,67 +114,92 @@ class _GeometryScreenState extends State<GeometryScreen> {
 
       case 'aire':
         final shape = _c('shape').text;
-        if (shape == 'rectangle') {
+        if (shape == 'rectangle' || shape.isEmpty) {
           final L = _v('L') ?? 0;
           final l = _v('l') ?? 0;
-          final aire = L * l;
-          buffer.writeln('Aire du rectangle = L × l = $L × $l = $aire');
           setState(() {
-            _result = 'Aire = $aire';
-            _steps = buffer.toString();
+            _result = 'Aire = ${L * l}';
+            _steps = 'Aire rectangle = L * l = $L * $l';
           });
         } else if (shape == 'triangle') {
           final base = _v('base') ?? 0;
           final h = _v('h') ?? 0;
-          final aire = base * h / 2;
-          buffer.writeln('Aire du triangle = (base × hauteur) / 2');
-          buffer.writeln('= ($base × $h) / 2 = $aire');
           setState(() {
-            _result = 'Aire = $aire';
-            _steps = buffer.toString();
+            _result = 'Aire = ${base * h / 2}';
+            _steps = 'Aire triangle = (base * h) / 2';
           });
-        } else if (shape == 'cercle') {
+        } else {
           final r = _v('r') ?? 0;
           final aire = math.pi * r * r;
-          buffer.writeln('Aire du cercle = π × r²');
-          buffer.writeln('= π × $r² = $aire');
           setState(() {
             _result = 'Aire ≈ ${aire.toStringAsFixed(6)}';
-            _steps = buffer.toString();
+            _steps = 'Aire cercle = pi * r^2';
           });
         }
         break;
 
       case 'volume':
         final shape = _c('shape').text;
-        if (shape == 'cube') {
+        if (shape == 'cube' || shape.isEmpty) {
           final a = _v('a') ?? 0;
-          final vol = a * a * a;
-          buffer.writeln('Volume du cube = a³ = $a³ = $vol');
           setState(() {
-            _result = 'Volume = $vol';
-            _steps = buffer.toString();
+            _result = 'Volume = ${a * a * a}';
+            _steps = 'Volume cube = a^3';
           });
-        } else if (shape == 'sphère') {
+        } else if (shape == 'sphere') {
           final r = _v('r') ?? 0;
           final vol = (4 / 3) * math.pi * r * r * r;
-          buffer.writeln('Volume de la sphère = (4/3) × π × r³');
-          buffer.writeln('= (4/3) × π × $r³ = $vol');
           setState(() {
             _result = 'Volume ≈ ${vol.toStringAsFixed(6)}';
-            _steps = buffer.toString();
+            _steps = 'Volume sphere = (4/3) * pi * r^3';
           });
-        } else if (shape == 'cylindre') {
+        } else {
           final r = _v('r') ?? 0;
           final h = _v('h') ?? 0;
           final vol = math.pi * r * r * h;
-          buffer.writeln('Volume du cylindre = π × r² × h');
-          buffer.writeln('= π × $r² × $h = $vol');
           setState(() {
             _result = 'Volume ≈ ${vol.toStringAsFixed(6)}';
-            _steps = buffer.toString();
+            _steps = 'Volume cylindre = pi * r^2 * h';
           });
         }
+        break;
+
+      case 'vecteurs':
+        final ux = _v('ux') ?? 0;
+        final uy = _v('uy') ?? 0;
+        final uz = _v('uz') ?? 0;
+        final vx = _v('vx') ?? 0;
+        final vy = _v('vy') ?? 0;
+        final vz = _v('vz') ?? 0;
+
+        final dot = ux * vx + uy * vy + uz * vz;
+        final cx = uy * vz - uz * vy;
+        final cy = uz * vx - ux * vz;
+        final cz = ux * vy - uy * vx;
+        final nu = math.sqrt(ux * ux + uy * uy + uz * uz);
+        final nv = math.sqrt(vx * vx + vy * vy + vz * vz);
+        final nc = math.sqrt(cx * cx + cy * cy + cz * cz);
+        double angleDeg = 0;
+        if (nu > 0 && nv > 0) {
+          final cosA = (dot / (nu * nv)).clamp(-1.0, 1.0);
+          angleDeg = math.acos(cosA) * 180 / math.pi;
+        }
+
+        buffer.writeln('u = ($ux, $uy, $uz)');
+        buffer.writeln('v = ($vx, $vy, $vz)');
+        buffer.writeln('');
+        buffer.writeln('Produit scalaire u·v = $ux*$vx + $uy*$vy + $uz*$vz = $dot');
+        buffer.writeln('Produit vectoriel u×v = ($cx, $cy, $cz)');
+        buffer.writeln('|u| = $nu');
+        buffer.writeln('|v| = $nv');
+        buffer.writeln('|u×v| = $nc');
+        buffer.writeln('Angle (u,v) ≈ ${angleDeg.toStringAsFixed(4)}°');
+
+        setState(() {
+          _result =
+              'u·v = $dot\nu×v = ($cx, $cy, $cz)\n|u|=${nu.toStringAsFixed(4)}  |v|=${nv.toStringAsFixed(4)}\nAngle ≈ ${angleDeg.toStringAsFixed(2)}°';
+          _steps = buffer.toString();
+        });
         break;
     }
   }
@@ -157,29 +207,35 @@ class _GeometryScreenState extends State<GeometryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Géométrie')),
+      appBar: AppBar(
+        title: const Text('Geometrie'),
+        actions: [
+          TextButton(onPressed: _loadExample, child: const Text('Exemple')),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
-              ChoiceChip(label: const Text('Pythagore'), selected: _tool == 'pythagore', onSelected: (_) => setState(() => _tool = 'pythagore')),
-              ChoiceChip(label: const Text('Thalès'), selected: _tool == 'thales', onSelected: (_) => setState(() => _tool = 'thales')),
-              ChoiceChip(label: const Text('Aires'), selected: _tool == 'aire', onSelected: (_) => setState(() => _tool = 'aire')),
-              ChoiceChip(label: const Text('Volumes'), selected: _tool == 'volume', onSelected: (_) => setState(() => _tool = 'volume')),
+              _chip('pythagore', 'Pythagore'),
+              _chip('thales', 'Thales'),
+              _chip('aire', 'Aires'),
+              _chip('volume', 'Volumes'),
+              _chip('vecteurs', 'Vecteurs 3D'),
             ],
           ),
           const SizedBox(height: 20),
           if (_tool == 'pythagore') ...[
-            _field('a', 'Côté a'),
-            _field('b', 'Côté b'),
-            _field('c', 'Hypoténuse c (laisser vide si cherché)'),
+            _field('a', 'Cote a'),
+            _field('b', 'Cote b'),
+            _field('c', 'Hypotenuse c (vide si cherche)'),
           ] else if (_tool == 'thales') ...[
             _field('ad', 'AD'),
             _field('ab', 'AB'),
             _field('ae', 'AE'),
-            _field('ac', 'AC (laisser vide si cherché)'),
           ] else if (_tool == 'aire') ...[
             DropdownButtonFormField<String>(
               value: _c('shape').text.isEmpty ? 'rectangle' : _c('shape').text,
@@ -189,38 +245,60 @@ class _GeometryScreenState extends State<GeometryScreen> {
                 DropdownMenuItem(value: 'cercle', child: Text('Cercle')),
               ],
               onChanged: (v) => setState(() => _c('shape').text = v!),
-              decoration: InputDecoration(labelText: 'Figure', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              decoration: InputDecoration(
+                labelText: 'Figure',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
             const SizedBox(height: 12),
-            if (_c('shape').text == 'rectangle' || _c('shape').text.isEmpty) ...[
-              _field('L', 'Longueur L'),
-              _field('l', 'Largeur l'),
-            ] else if (_c('shape').text == 'triangle') ...[
+            if (_c('shape').text == 'triangle') ...[
               _field('base', 'Base'),
               _field('h', 'Hauteur'),
-            ] else ...[
+            ] else if (_c('shape').text == 'cercle') ...[
               _field('r', 'Rayon r'),
+            ] else ...[
+              _field('L', 'Longueur L'),
+              _field('l', 'Largeur l'),
             ],
           ] else if (_tool == 'volume') ...[
             DropdownButtonFormField<String>(
               value: _c('shape').text.isEmpty ? 'cube' : _c('shape').text,
               items: const [
                 DropdownMenuItem(value: 'cube', child: Text('Cube')),
-                DropdownMenuItem(value: 'sphère', child: Text('Sphère')),
+                DropdownMenuItem(value: 'sphere', child: Text('Sphere')),
                 DropdownMenuItem(value: 'cylindre', child: Text('Cylindre')),
               ],
               onChanged: (v) => setState(() => _c('shape').text = v!),
-              decoration: InputDecoration(labelText: 'Solide', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              decoration: InputDecoration(
+                labelText: 'Solide',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
             const SizedBox(height: 12),
-            if (_c('shape').text == 'cube' || _c('shape').text.isEmpty)
-              _field('a', 'Arête a')
-            else if (_c('shape').text == 'sphère')
+            if (_c('shape').text == 'sphere')
               _field('r', 'Rayon r')
-            else ...[
+            else if (_c('shape').text == 'cylindre') ...[
               _field('r', 'Rayon r'),
               _field('h', 'Hauteur h'),
-            ],
+            ] else
+              _field('a', 'Arete a'),
+          ] else if (_tool == 'vecteurs') ...[
+            const Text('Vecteur u', style: TextStyle(fontWeight: FontWeight.bold)),
+            Row(children: [
+              Expanded(child: _field('ux', 'ux')),
+              const SizedBox(width: 8),
+              Expanded(child: _field('uy', 'uy')),
+              const SizedBox(width: 8),
+              Expanded(child: _field('uz', 'uz')),
+            ]),
+            const Text('Vecteur v', style: TextStyle(fontWeight: FontWeight.bold)),
+            Row(children: [
+              Expanded(child: _field('vx', 'vx')),
+              const SizedBox(width: 8),
+              Expanded(child: _field('vy', 'vy')),
+              const SizedBox(width: 8),
+              Expanded(child: _field('vz', 'vz')),
+            ]),
           ],
           const SizedBox(height: 20),
           FilledButton(
@@ -237,7 +315,11 @@ class _GeometryScreenState extends State<GeometryScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(18),
-                child: Text(_result, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                child: Text(
+                  _result,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ).animate().fadeIn().scale(),
             const SizedBox(height: 12),
@@ -254,12 +336,22 @@ class _GeometryScreenState extends State<GeometryScreen> {
     );
   }
 
+  Widget _chip(String id, String label) => ChoiceChip(
+        label: Text(label),
+        selected: _tool == id,
+        onSelected: (_) => setState(() {
+          _tool = id;
+          _result = '';
+          _steps = '';
+        }),
+      );
+
   Widget _field(String key, String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextField(
         controller: _c(key),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

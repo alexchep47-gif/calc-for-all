@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK + Web
 
 on:
   push:
@@ -6,33 +6,52 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
-      - name: Build APK arm64 (release)
+      - name: Build APK arm64
         run: flutter build apk --release --target-platform android-arm64
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: calc-for-all-apk-arm64
           path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - run: flutter pub get
+
+      - name: Enable web and generate platform if needed
+        run: |
+          flutter config --enable-web
+          flutter create --project-name calc_for_all --platforms=web .
+
+      - name: Build Flutter Web (release)
+        run: flutter build web --release --base-href "/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: calc-for-all-web
+          path: build/web

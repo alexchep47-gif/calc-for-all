@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
-/// Moteur hors-ligne volontairement petit : il couvre les opérateurs et
-/// fonctions utilisés par Calc For All sans dépendre d'un service distant.
+/// Moteur hors-ligne : opérateurs, fonctions usuelles, multiplication implicite.
 class MathExpressionEngine {
   static const _functions = {
     'sin',
@@ -14,13 +13,15 @@ class MathExpressionEngine {
     'abs',
     'log',
     'ln',
+    'in', // autocorrect clavier FR (In → in)
     'exp',
     'floor',
     'ceil',
   };
 
+  /// Nettoie l'entrée : 2x → 2*x, ln/In → log, ^, π, etc.
   String normalize(String input) {
-    final source = input
+    var source = input
         .replaceAll('×', '*')
         .replaceAll('·', '*')
         .replaceAll('÷', '/')
@@ -29,11 +30,22 @@ class MathExpressionEngine {
         .replaceAll('√', 'sqrt')
         .replaceAll('²', '^2')
         .replaceAll('³', '^3')
-        .replaceAll(',', '.');
-    final tokens = _tokenize(source.replaceAll(' ', '').toLowerCase());
+        .replaceAll(',', '.')
+        .replaceAll(' ', '');
+
+    // Autocorrect courant : In / LN → ln
+    source = source
+        .replaceAll(RegExp(r'\bIn\b'), 'ln')
+        .replaceAll(RegExp(r'\bIN\b'), 'ln')
+        .replaceAll(RegExp(r'\bLn\b'), 'ln');
+
+    final tokens = _tokenize(source.toLowerCase());
     final out = <String>[];
     for (var i = 0; i < tokens.length; i++) {
-      final current = tokens[i];
+      var current = tokens[i];
+      // ln / in → log (logarithme naturel)
+      if (current == 'ln' || current == 'in') current = 'log';
+
       if (out.isNotEmpty &&
           _endsValue(out.last) &&
           _startsValue(current) &&
@@ -41,16 +53,18 @@ class MathExpressionEngine {
           !(_isFunction(out.last) && current == '(')) {
         out.add('*');
       }
-      out.add(current == 'ln' ? 'log' : current);
+      out.add(current);
     }
     return out.join();
   }
 
   double? evaluate(String input, double x) {
     try {
-      final root = _Parser(_tokenize(normalize(input))).parse();
+      final normalized = normalize(input);
+      final root = _Parser(_tokenize(normalized)).parse();
       final value = root.evaluate(x);
-      return value.isFinite ? value : null;
+      if (value.isNaN || !value.isFinite) return null;
+      return value;
     } catch (_) {
       return null;
     }
@@ -58,11 +72,66 @@ class MathExpressionEngine {
 
   String? derivative(String input) {
     try {
-      final root = _Parser(_tokenize(normalize(input))).parse();
+      final normalized = normalize(input);
+      final root = _Parser(_tokenize(normalized)).parse();
       return root.derivative().simplify().format();
     } catch (_) {
       return null;
     }
+  }
+
+  /// Estime un intervalle de tracé raisonnable (évite ln de négatif, etc.).
+  ({double xMin, double xMax}) suggestDomain(
+    String input, {
+    double fallbackMin = -10,
+    double fallbackMax = 10,
+  }) {
+    final expr = normalize(input);
+
+    // log(ax+b) → ax+b > 0
+    final logMatch = RegExp(
+      r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
+    ).firstMatch(expr);
+    if (logMatch != null) {
+      final a = _coeff(logMatch.group(1));
+      final b = double.tryParse(logMatch.group(2) ?? '0') ?? 0;
+      if (a > 0) {
+        final bound = -b / a;
+        return (xMin: bound + 0.05, xMax: bound + 12);
+      }
+      if (a < 0) {
+        final bound = -b / a;
+        return (xMin: bound - 12, xMax: bound - 0.05);
+      }
+    }
+    if (RegExp(r'log\(x\)').hasMatch(expr)) {
+      return (xMin: 0.05, xMax: 10);
+    }
+
+    // sqrt(ax+b) → ax+b ≥ 0
+    final sqrtMatch = RegExp(
+      r'sqrt\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
+    ).firstMatch(expr);
+    if (sqrtMatch != null) {
+      final a = _coeff(sqrtMatch.group(1));
+      final b = double.tryParse(sqrtMatch.group(2) ?? '0') ?? 0;
+      if (a > 0) {
+        final bound = -b / a;
+        return (xMin: bound, xMax: bound + 12);
+      }
+      if (a < 0) {
+        final bound = -b / a;
+        return (xMin: bound - 12, xMax: bound);
+      }
+    }
+
+    return (xMin: fallbackMin, xMax: fallbackMax);
+  }
+
+  double _coeff(String? value) {
+    if (value == null || value.isEmpty || value == '+') return 1;
+    if (value == '-') return -1;
+    return double.tryParse(value) ?? 1;
   }
 
   List<String> _tokenize(String source) {
@@ -76,20 +145,24 @@ class MathExpressionEngine {
           if ((source[i] == '+' || source[i] == '-') &&
               i > start &&
               source[i - 1] != 'e' &&
-              source[i - 1] != 'E') break;
+              source[i - 1] != 'E') {
+            break;
+          }
           i++;
         }
         result.add(source.substring(start, i));
       } else if (RegExp(r'[a-zA-Z_]').hasMatch(c)) {
         final start = i++;
-        while (i < source.length && RegExp(r'[a-zA-Z_0-9]').hasMatch(source[i]))
+        while (i < source.length &&
+            RegExp(r'[a-zA-Z_0-9]').hasMatch(source[i])) {
           i++;
+        }
         result.add(source.substring(start, i));
       } else if ('+-*/^(),'.contains(c)) {
         result.add(c);
         i++;
       } else {
-        throw FormatException('Caractère non reconnu : $c');
+        i++; // ignorer caractères inconnus plutôt que planter
       }
     }
     return result;
@@ -183,9 +256,12 @@ class _Binary extends _Node {
   final _Node left;
   final _Node right;
   _Binary(this.op, this.left, this.right);
+
   @override
   double evaluate(double x) {
-    final a = left.evaluate(x), b = right.evaluate(x);
+    final a = left.evaluate(x);
+    final b = right.evaluate(x);
+    if (a.isNaN || b.isNaN) return double.nan;
     switch (op) {
       case '+':
         return a + b;
@@ -218,7 +294,7 @@ class _Binary extends _Node {
           _Binary('^', v, _Number(2)),
         );
       case '^':
-        if (v is _Number)
+        if (v is _Number) {
           return _Binary(
             '*',
             _Binary(
@@ -228,6 +304,7 @@ class _Binary extends _Node {
             ),
             du,
           );
+        }
         return _Binary(
           '*',
           _Binary('^', u, v),
@@ -261,9 +338,11 @@ class _Function extends _Node {
   final String name;
   final _Node argument;
   _Function(this.name, this.argument);
+
   @override
   double evaluate(double x) {
     final a = argument.evaluate(x);
+    if (a.isNaN) return double.nan;
     switch (name) {
       case 'log':
         return a > 0 ? math.log(a) : double.nan;
@@ -364,6 +443,7 @@ class _Parser {
   final List<String> tokens;
   int index = 0;
   _Parser(this.tokens);
+
   _Node parse() {
     if (tokens.isEmpty) throw FormatException('Expression vide');
     final result = _expression();
@@ -392,8 +472,10 @@ class _Parser {
   }
 
   _Node _unary() {
-    if (index < tokens.length && (tokens[index] == '+' || tokens[index] == '-'))
+    if (index < tokens.length &&
+        (tokens[index] == '+' || tokens[index] == '-')) {
       return _Unary(tokens[index++], _unary());
+    }
     return _power();
   }
 
@@ -415,16 +497,20 @@ class _Parser {
     if (t == 'pi' || t == 'e') return _Constant(t);
     if (t == '(') {
       final n = _expression();
-      if (index >= tokens.length || tokens[index++] != ')')
+      if (index >= tokens.length || tokens[index++] != ')') {
         throw FormatException('Parenthèse manquante');
+      }
       return n;
     }
-    if (MathExpressionEngine._functions.contains(t)) {
-      if (index >= tokens.length || tokens[index++] != '(')
+    if (MathExpressionEngine._functions.contains(t) || t == 'log') {
+      final name = (t == 'ln' || t == 'in') ? 'log' : t;
+      if (index >= tokens.length || tokens[index++] != '(') {
         throw FormatException('Parenthèse attendue');
-      final n = _Function(t, _expression());
-      if (index >= tokens.length || tokens[index++] != ')')
+      }
+      final n = _Function(name, _expression());
+      if (index >= tokens.length || tokens[index++] != ')') {
         throw FormatException('Parenthèse manquante');
+      }
       return n;
     }
     throw FormatException('Symbole inconnu : $t');

@@ -10,10 +10,8 @@ import 'data/storage/local_storage.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // URL hash pour https://calc-for-all-web.vercel.app/app/#/home
+  // https://calc-for-all-web.vercel.app/app/#/home
   if (kIsWeb) {
-    usePathUrlStrategy();
-    // On force le hash pour coller a l URL cible /app/#/...
     setUrlStrategy(HashUrlStrategy());
   }
 

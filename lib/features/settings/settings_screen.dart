@@ -22,7 +22,9 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.brightness_6),
             title: const Text('Thème'),
-            subtitle: Text(_themeLabel(themeProvider.themeMode)),
+            subtitle: Text(themeProvider.isOled
+                ? 'OLED noir'
+                : _themeLabel(themeProvider.themeMode)),
             onTap: () {
               showModalBottomSheet(
                 context: context,
@@ -62,12 +64,21 @@ class SettingsScreen extends StatelessWidget {
               );
             },
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.contrast_rounded),
+            title: const Text('Mode OLED'),
+            subtitle:
+                const Text('Fond noir pour les écrans OLED et la batterie'),
+            value: themeProvider.isOled,
+            onChanged: (value) => themeProvider.setOled(value),
+          ),
           const Divider(),
           // À propos
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('À propos'),
-            subtitle: Text('${AppConstants.appName} v${AppConstants.appVersion}'),
+            subtitle:
+                Text('${AppConstants.appName} v${AppConstants.appVersion}'),
             onTap: () {
               showAboutDialog(
                 context: context,

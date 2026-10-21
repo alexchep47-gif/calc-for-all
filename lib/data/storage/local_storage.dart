@@ -11,6 +11,10 @@ class LocalStorage extends ChangeNotifier {
 
   List<CalculationHistory> get history => List.unmodifiable(_history);
 
+  Set<String> get favoriteModules =>
+      (_prefs?.getStringList(AppConstants.keyFavorites) ?? const <String>[])
+          .toSet();
+
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     await _loadHistory();
@@ -70,5 +74,12 @@ class LocalStorage extends ChangeNotifier {
 
   Future<void> setThemeMode(String mode) async {
     await _prefs?.setString(AppConstants.keyThemeMode, mode);
+  }
+
+  Future<void> toggleFavorite(String route) async {
+    final favorites = favoriteModules;
+    if (!favorites.add(route)) favorites.remove(route);
+    await _prefs?.setStringList(AppConstants.keyFavorites, favorites.toList());
+    notifyListeners();
   }
 }

@@ -9,6 +9,7 @@ class AppConstants {
   static const String keyThemeMode = 'theme_mode';
   static const String keyOnboardingDone = 'onboarding_done';
   static const String keyHistory = 'calculation_history';
+  static const String keyFavorites = 'favorite_modules';
   static const String keyPinCode = 'pin_code';
 
   // Limites

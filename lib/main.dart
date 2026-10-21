@@ -30,12 +30,17 @@ class CalcForAllApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
+          if (!themeProvider.hasLoaded) {
+            themeProvider.load();
+          }
           return MaterialApp(
             title: 'Calc For All',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
+            darkTheme:
+                themeProvider.isOled ? AppTheme.oledTheme : AppTheme.darkTheme,
+            themeMode:
+                themeProvider.isOled ? ThemeMode.dark : themeProvider.themeMode,
             initialRoute: AppRoutes.onboarding,
             routes: AppRoutes.routes,
           );

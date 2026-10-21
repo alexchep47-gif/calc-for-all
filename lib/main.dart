@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routes/app_routes.dart';
@@ -7,10 +9,21 @@ import 'data/storage/local_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+
+  // URL hash pour https://calc-for-all-web.vercel.app/app/#/home
+  if (kIsWeb) {
+    usePathUrlStrategy();
+    // On force le hash pour coller a l URL cible /app/#/...
+    setUrlStrategy(HashUrlStrategy());
+  }
+
+  if (!kIsWeb) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
+
   runApp(const CalcForAllApp());
 }
 

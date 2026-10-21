@@ -34,6 +34,7 @@ class FunctionStudyResult {
 class FunctionAnalysisService {
   final MathExpressionEngine _engine;
   final GraphService _graph;
+
   FunctionAnalysisService({MathExpressionEngine? engine})
       : _engine = engine ?? MathExpressionEngine(),
         _graph = GraphService(engine: engine ?? MathExpressionEngine());
@@ -80,30 +81,47 @@ class FunctionAnalysisService {
   }
 
   String _domain(String expr) {
-    final log = RegExp(r'(?:log)\(([-+]?\d*\.?\d*)\*?x(?:([-+]\d*\.?\d+))?\)')
-        .firstMatch(expr);
+    // log(ax+b) avec a optionnel
+    final log = RegExp(
+      r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
+    ).firstMatch(expr);
     if (log != null) {
       final a = _coefficient(log.group(1));
       final b = double.tryParse(log.group(2) ?? '0') ?? 0;
-      if (a > 0)
-        return 'D = ]${_fmt(-b / a)} ; +∞[ car ${_fmt(a)}x ${b >= 0 ? '+' : '−'} ${_fmt(b.abs())} > 0.';
-      if (a < 0)
-        return 'D = ]−∞ ; ${_fmt(-b / a)}[ car ${_fmt(a)}x ${b >= 0 ? '+' : '−'} ${_fmt(b.abs())} > 0.';
+      final bound = -b / a;
+      if (a > 0) {
+        return 'D = ]${_fmt(bound)} ; +∞[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  ⇒  x > ${_fmt(bound)}.';
+      }
+      if (a < 0) {
+        return 'D = ]−∞ ; ${_fmt(bound)}[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  ⇒  x < ${_fmt(bound)}.';
+      }
     }
-    if (RegExp(r'log\(x\)').hasMatch(expr)) return 'D = ]0 ; +∞[ car x > 0.';
-    final sqrt = RegExp(r'sqrt\(([-+]?\d*\.?\d*)\*?x(?:([-+]\d*\.?\d+))?\)')
-        .firstMatch(expr);
+    if (RegExp(r'log\(x\)').hasMatch(expr)) {
+      return 'D = ]0 ; +∞[  car x > 0.';
+    }
+
+    final sqrt = RegExp(
+      r'sqrt\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
+    ).firstMatch(expr);
     if (sqrt != null) {
       final a = _coefficient(sqrt.group(1));
       final b = double.tryParse(sqrt.group(2) ?? '0') ?? 0;
-      return a >= 0
-          ? 'D = [${_fmt(-b / a)} ; +∞[ car ${_fmt(a)}x + ${_fmt(b)} ≥ 0.'
-          : 'D = ]−∞ ; ${_fmt(-b / a)}] car ${_fmt(a)}x + ${_fmt(b)} ≥ 0.';
+      final bound = -b / a;
+      if (a > 0) {
+        return 'D = [${_fmt(bound)} ; +∞[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} ≥ 0.';
+      }
+      if (a < 0) {
+        return 'D = ]−∞ ; ${_fmt(bound)}]  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} ≥ 0.';
+      }
     }
-    if (expr.contains('/'))
+
+    if (expr.contains('/')) {
       return 'D = R privé des zéros du dénominateur (à déterminer selon l’expression).';
+    }
     return 'D = R (aucune contrainte réelle détectée).';
   }
+
+  String _sign(double b) => b >= 0 ? '+' : '−';
 
   double _coefficient(String? value) {
     if (value == null || value.isEmpty || value == '+') return 1;
@@ -115,20 +133,21 @@ class FunctionAnalysisService {
     String derivative,
     List<MapEntry<double, double>> points,
   ) {
-    if (points.length < 3 || derivative.startsWith('Non'))
+    if (points.length < 3 || derivative.startsWith('Non')) {
       return ['Racines de f′ non déterminées automatiquement.'];
+    }
     final result = <String>[];
     double? lastRoot;
     for (var i = 1; i < points.length; i++) {
       final a = points[i - 1], b = points[i];
-      final da = _engine.evaluate(derivative, a.key),
-          db = _engine.evaluate(derivative, b.key);
+      final da = _engine.evaluate(derivative, a.key);
+      final db = _engine.evaluate(derivative, b.key);
       if (da == null || db == null || !da.isFinite || !db.isFinite) continue;
       if (da == 0 || da * db < 0) {
         final root = da == 0 ? a.key : (a.key + b.key) / 2;
         if (lastRoot != null && (root - lastRoot).abs() < 0.08) continue;
         final kind = da > 0 && db < 0 ? 'Maximum local' : 'Minimum local';
-        result.add('$kind : f′(${_fmt(root)}) = 0 (changement de signe).');
+        result.add('$kind : f′(${_fmt(root)}) ≈ 0 (changement de signe).');
         lastRoot = root;
         if (result.length >= 8) break;
       }
@@ -140,24 +159,31 @@ class FunctionAnalysisService {
 
   List<String> _asymptotes(String expr, double xMin, double xMax) {
     final result = <String>[];
-    final log = RegExp(r'(?:log)\(([-+]?\d*\.?\d*)\*?x(?:([-+]\d*\.?\d+))?\)')
-        .firstMatch(expr);
-    if (log != null)
-      result.add(
-        'Verticale : x = ${_fmt(-(double.tryParse(log.group(2) ?? '0') ?? 0) / _coefficient(log.group(1)))}.',
-      );
-    if (RegExp(r'log\(x\)').hasMatch(expr)) result.add('Verticale : x = 0.');
-    if (expr.contains('/'))
+    final log = RegExp(
+      r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
+    ).firstMatch(expr);
+    if (log != null) {
+      final a = _coefficient(log.group(1));
+      final b = double.tryParse(log.group(2) ?? '0') ?? 0;
+      result.add('Asymptote verticale : x = ${_fmt(-b / a)}.');
+    }
+    if (RegExp(r'log\(x\)').hasMatch(expr)) {
+      result.add('Asymptote verticale : x = 0.');
+    }
+    if (expr.contains('/')) {
       result.add('Verticales possibles aux zéros du dénominateur.');
-    final right = _engine.evaluate(expr, xMax),
-        left = _engine.evaluate(expr, xMin);
-    if (right != null && (right - xMax).abs() < 0.2)
-      result.add('Oblique possible à droite : y ≈ x.');
-    else if (right != null && right.abs() < 0.1)
-      result.add('Horizontale à droite : y = 0.');
-    if (left != null && left.abs() < 0.1)
-      result.add('Horizontale à gauche : y = 0.');
-    return result.isEmpty ? ['Aucune asymptote élémentaire détectée.'] : result;
+    }
+    final right = _engine.evaluate(expr, xMax);
+    final left = _engine.evaluate(expr, xMin);
+    if (right != null && right.abs() < 0.1) {
+      result.add('Asymptote horizontale à droite : y = 0.');
+    }
+    if (left != null && left.abs() < 0.1) {
+      result.add('Asymptote horizontale à gauche : y = 0.');
+    }
+    return result.isEmpty
+        ? ['Aucune asymptote élémentaire détectée.']
+        : result;
   }
 
   String _limits(
@@ -166,10 +192,17 @@ class FunctionAnalysisService {
     double xMax,
     List<String> asymptotes,
   ) {
-    final l = _engine.evaluate(expr, xMin), r = _engine.evaluate(expr, xMax);
-    String value(double? v) =>
-        v == null ? 'non définie' : (v.abs() > 1e6 ? '±∞' : _fmt(v));
-    return 'Limite à gauche de l’intervalle : ${value(l)} ; limite à droite : ${value(r)}.\nLes limites aux bornes interdites sont indiquées par les asymptotes lorsqu’elles existent.';
+    final l = _engine.evaluate(expr, xMin);
+    final r = _engine.evaluate(expr, xMax);
+    String value(double? v) {
+      if (v == null) return 'non définie';
+      if (v.abs() > 1e6) return '±∞';
+      return _fmt(v);
+    }
+
+    return 'Limite près de la borne gauche (x≈${_fmt(xMin)}) : ${value(l)}\n'
+        'Limite près de la borne droite (x≈${_fmt(xMax)}) : ${value(r)}\n'
+        'Les asymptotes indiquent les comportements aux bornes interdites.';
   }
 
   String _period(String expr) {
@@ -188,17 +221,19 @@ class FunctionAnalysisService {
 
   bool _compare(String a, String b) {
     for (final x in [-3.0, -1.2, 0.7, 2.5]) {
-      final av = _engine.evaluate(a, x), bv = _engine.evaluate(b, x);
+      final av = _engine.evaluate(a, x);
+      final bv = _engine.evaluate(b, x);
       if (av == null || bv == null || (av - bv).abs() > 1e-5) return false;
     }
     return true;
   }
 
   String _variation(String derivative, List<MapEntry<double, double>> points) {
-    if (points.length < 2)
+    if (points.length < 2) {
       return 'Données insuffisantes pour le tableau de variation.';
+    }
     final rows = <String>[
-      'x        | signe de f′ | variation',
+      'x        | signe de f\' | variation',
       '---------|-------------|-----------',
     ];
     final step = math.max(1, (points.length / 10).round());
@@ -206,17 +241,17 @@ class FunctionAnalysisService {
       final p = points[i];
       final d = _engine.evaluate(derivative, p.key);
       final sign = d == null
-          ? 'indéfini'
+          ? 'indet.'
           : d.abs() < 1e-5
               ? '0'
               : d > 0
                   ? '+'
-                  : '−';
+                  : '-';
       final direction = sign == '+'
           ? 'croissante'
-          : sign == '−'
-              ? 'décroissante'
-              : 'à étudier';
+          : sign == '-'
+              ? 'decroissante'
+              : 'a etudier';
       rows.add('${_fmt(p.key).padLeft(8)} | ${sign.padLeft(11)} | $direction');
     }
     return rows.join('\n');
@@ -232,25 +267,25 @@ class FunctionAnalysisService {
     String period,
     String symmetry,
   ) =>
-      '''Méthode hors-ligne :
-1. Normalisation : les multiplications implicites sont explicitées (par exemple 2x devient 2*x) et ln est traité comme log naturel.
-2. Domaine : on impose les contraintes réelles des logarithmes, racines et dénominateurs.
-3. Dérivée : application récursive des règles de somme, produit, quotient, puissance et fonctions usuelles.
+      '''Methode hors-ligne :
+1. Normalisation : 2x devient 2*x ; ln / In devient log (logarithme naturel).
+2. Domaine : contraintes reelles des logarithmes, racines et denominateurs.
+3. Derivee : regles de somme, produit, quotient, puissance et fonctions usuelles.
 
 Fonction : f(x) = $expression
 Domaine : $domain
-Dérivée : f′(x) = $derivative
-Racines de f′ et extremums : ${extrema.join(' ; ')}
+Derivee : f'(x) = $derivative
+Racines de f' et extremums : ${extrema.join(' ; ')}
 Limites : $limits
 Asymptotes : ${asymptotes.join(' ; ')}
-Variation : le signe de f′ détermine les intervalles croissants et décroissants.
-Périodicité : $period
-Parité : $symmetry''';
+Variation : le signe de f' determine les intervalles croissants et decroissants.
+Periodicite : $period
+Parite : $symmetry''';
 
   String _fmt(double value) => value.abs() < 1e-9
       ? '0'
       : value
           .toStringAsFixed(3)
-          .replaceFirst(RegExp(r'0+$'), '')
-          .replaceFirst(RegExp(r'\.$'), '');
+          .replaceFirst(RegExp(r'0+\$'), '')
+          .replaceFirst(RegExp(r'\.\$'), '');
 }

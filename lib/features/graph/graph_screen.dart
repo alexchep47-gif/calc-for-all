@@ -14,7 +14,6 @@ import '../../data/services/graph_service.dart';
 import '../../data/services/function_analysis_service.dart';
 import '../../data/services/math_expression_engine.dart';
 
-/// Écran de tracé + étude de fonction complète
 class GraphScreen extends StatefulWidget {
   const GraphScreen({super.key});
 
@@ -37,9 +36,19 @@ class _GraphScreenState extends State<GraphScreen>
   double _xMax = 10;
   String _error = '';
   bool _loading = false;
-  bool _autoDomain = true; // ajuste la fenêtre pour ln / sqrt
+  bool _autoDomain = true;
   late TabController _tabController;
   final GlobalKey _chartKey = GlobalKey();
+
+  static const _examples = [
+    'ln(2x+1)',
+    'sin(x)',
+    'x^2',
+    '1/x',
+    'sqrt(x-1)',
+    'cos(x)+x',
+  ];
+  int _exampleIndex = 0;
 
   @override
   void initState() {
@@ -53,6 +62,15 @@ class _GraphScreenState extends State<GraphScreen>
     _tabController.dispose();
     _funcController.dispose();
     super.dispose();
+  }
+
+  void _loadExample() {
+    setState(() {
+      _funcController.text = _examples[_exampleIndex % _examples.length];
+      _exampleIndex++;
+      _autoDomain = true;
+    });
+    _analyze();
   }
 
   Future<void> _analyze() async {
@@ -73,7 +91,6 @@ class _GraphScreenState extends State<GraphScreen>
     }
 
     try {
-      // Domaine automatique pour log / sqrt
       if (_autoDomain) {
         final suggested = _engine.suggestDomain(expr);
         _xMin = suggested.xMin;
@@ -90,7 +107,7 @@ class _GraphScreenState extends State<GraphScreen>
         if (_spots.isEmpty) {
           _error =
               'Aucun point calculable sur [${_xMin.toStringAsFixed(2)} ; ${_xMax.toStringAsFixed(2)}].\n'
-              'Vérifie l\'écriture (ex: ln(2x+1) ou log(2*x+1)) et le domaine.';
+              'Verifie l\'ecriture (ex: ln(2x+1)) et le domaine.';
         }
       });
     } catch (e) {
@@ -129,9 +146,8 @@ class _GraphScreenState extends State<GraphScreen>
       final base = pw.TextStyle(font: regular, fontSize: 10);
       final heading = pw.TextStyle(font: bold, fontSize: 13);
 
-      // Texte ASCII-safe pour éviter tout bug d'encodage restant
       String safe(String s) => s
-          .replaceAll('′', "'")
+          .replaceAll("'", "'")
           .replaceAll('−', '-')
           .replaceAll('∞', 'inf')
           .replaceAll('π', 'pi')
@@ -193,7 +209,7 @@ class _GraphScreenState extends State<GraphScreen>
               )
             else
               pw.Text(
-                '(Courbe non disponible - ouvre l\'onglet Graphique puis reexporte)',
+                '(Courbe non disponible - ouvre l onglet Graphique puis reexporte)',
                 style: base,
               ),
             pw.SizedBox(height: 12),
@@ -231,8 +247,12 @@ class _GraphScreenState extends State<GraphScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Étude de fonction'),
+        title: const Text('Etude de fonction'),
         actions: [
+          TextButton(
+            onPressed: _loadExample,
+            child: const Text('Exemple'),
+          ),
           if (_study != null)
             IconButton(
               icon: const Icon(Icons.picture_as_pdf),
@@ -244,7 +264,7 @@ class _GraphScreenState extends State<GraphScreen>
           controller: _tabController,
           tabs: const [
             Tab(text: 'Graphique'),
-            Tab(text: 'Étude complète'),
+            Tab(text: 'Etude complete'),
           ],
         ),
       ),
@@ -296,7 +316,7 @@ class _GraphScreenState extends State<GraphScreen>
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                _zoomBtn('−', () {
+                _zoomBtn('-', () {
                   setState(() {
                     _autoDomain = false;
                     _xMin -= 3;
@@ -416,7 +436,7 @@ class _GraphScreenState extends State<GraphScreen>
   Widget _buildStudy() {
     if (_study == null) {
       return const Center(
-        child: Text('Analyse une fonction pour voir l’étude'),
+        child: Text('Analyse une fonction pour voir l etude'),
       );
     }
 
@@ -424,28 +444,28 @@ class _GraphScreenState extends State<GraphScreen>
       padding: const EdgeInsets.all(16),
       children: [
         _section('Fonction', 'f(x) = ${_study!.expression}', Icons.functions),
-        _section('Domaine de définition', _study!.domain, Icons.domain),
+        _section('Domaine de definition', _study!.domain, Icons.domain),
         _section(
-          'Dérivée symbolique',
+          'Derivee symbolique',
           "f'(x) = ${_study!.derivative}",
           Icons.functions,
         ),
         _section('Limites', _study!.limits, Icons.compare_arrows),
-        _section('Périodicité', _study!.period, Icons.loop),
+        _section('Periodicite', _study!.period, Icons.loop),
         _sectionList('Extremums', _study!.extrema, Icons.trending_up),
         _sectionList(
           'Asymptotes',
           _study!.asymptotes,
           Icons.vertical_align_center,
         ),
-        _section('Symétrie', _study!.symmetry, Icons.swap_horiz),
+        _section('Symetrie', _study!.symmetry, Icons.swap_horiz),
         _section(
           'Tableau de variation (extrait)',
           _study!.variationTable,
           Icons.table_chart,
         ),
         _section(
-          'Explications détaillées',
+          'Explications detaillees',
           _study!.explanations,
           Icons.menu_book,
         ),
@@ -453,7 +473,7 @@ class _GraphScreenState extends State<GraphScreen>
         FilledButton.icon(
           onPressed: _exportPdf,
           icon: const Icon(Icons.picture_as_pdf),
-          label: const Text('Exporter le plan d’étude en PDF'),
+          label: const Text('Exporter le plan d etude en PDF'),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(52),
             shape: RoundedRectangleBorder(

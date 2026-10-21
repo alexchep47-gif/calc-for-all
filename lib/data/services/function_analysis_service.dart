@@ -81,7 +81,6 @@ class FunctionAnalysisService {
   }
 
   String _domain(String expr) {
-    // log(ax+b) avec a optionnel
     final log = RegExp(
       r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
     ).firstMatch(expr);
@@ -90,14 +89,14 @@ class FunctionAnalysisService {
       final b = double.tryParse(log.group(2) ?? '0') ?? 0;
       final bound = -b / a;
       if (a > 0) {
-        return 'D = ]${_fmt(bound)} ; +∞[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  ⇒  x > ${_fmt(bound)}.';
+        return 'D = ]${_fmt(bound)} ; +inf[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  =>  x > ${_fmt(bound)}.';
       }
       if (a < 0) {
-        return 'D = ]−∞ ; ${_fmt(bound)}[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  ⇒  x < ${_fmt(bound)}.';
+        return 'D = ]-inf ; ${_fmt(bound)}[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  =>  x < ${_fmt(bound)}.';
       }
     }
     if (RegExp(r'log\(x\)').hasMatch(expr)) {
-      return 'D = ]0 ; +∞[  car x > 0.';
+      return 'D = ]0 ; +inf[  car x > 0.';
     }
 
     final sqrt = RegExp(
@@ -108,20 +107,20 @@ class FunctionAnalysisService {
       final b = double.tryParse(sqrt.group(2) ?? '0') ?? 0;
       final bound = -b / a;
       if (a > 0) {
-        return 'D = [${_fmt(bound)} ; +∞[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} ≥ 0.';
+        return 'D = [${_fmt(bound)} ; +inf[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} >= 0.';
       }
       if (a < 0) {
-        return 'D = ]−∞ ; ${_fmt(bound)}]  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} ≥ 0.';
+        return 'D = ]-inf ; ${_fmt(bound)}]  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} >= 0.';
       }
     }
 
     if (expr.contains('/')) {
-      return 'D = R privé des zéros du dénominateur (à déterminer selon l’expression).';
+      return 'D = R prive des zeros du denominateur (a determiner selon l expression).';
     }
-    return 'D = R (aucune contrainte réelle détectée).';
+    return 'D = R (aucune contrainte reelle detectee).';
   }
 
-  String _sign(double b) => b >= 0 ? '+' : '−';
+  String _sign(double b) => b >= 0 ? '+' : '-';
 
   double _coefficient(String? value) {
     if (value == null || value.isEmpty || value == '+') return 1;
@@ -134,7 +133,7 @@ class FunctionAnalysisService {
     List<MapEntry<double, double>> points,
   ) {
     if (points.length < 3 || derivative.startsWith('Non')) {
-      return ['Racines de f′ non déterminées automatiquement.'];
+      return ['Racines de f\' non determinees automatiquement.'];
     }
     final result = <String>[];
     double? lastRoot;
@@ -147,13 +146,13 @@ class FunctionAnalysisService {
         final root = da == 0 ? a.key : (a.key + b.key) / 2;
         if (lastRoot != null && (root - lastRoot).abs() < 0.08) continue;
         final kind = da > 0 && db < 0 ? 'Maximum local' : 'Minimum local';
-        result.add('$kind : f′(${_fmt(root)}) ≈ 0 (changement de signe).');
+        result.add('$kind : f\'(${_fmt(root)}) approx 0 (changement de signe).');
         lastRoot = root;
         if (result.length >= 8) break;
       }
     }
     return result.isEmpty
-        ? ['Aucune racine de f′ détectée sur l’intervalle étudié.']
+        ? ['Aucune racine de f\' detectee sur l intervalle etudie.']
         : result;
   }
 
@@ -171,18 +170,18 @@ class FunctionAnalysisService {
       result.add('Asymptote verticale : x = 0.');
     }
     if (expr.contains('/')) {
-      result.add('Verticales possibles aux zéros du dénominateur.');
+      result.add('Verticales possibles aux zeros du denominateur.');
     }
     final right = _engine.evaluate(expr, xMax);
     final left = _engine.evaluate(expr, xMin);
     if (right != null && right.abs() < 0.1) {
-      result.add('Asymptote horizontale à droite : y = 0.');
+      result.add('Asymptote horizontale a droite : y = 0.');
     }
     if (left != null && left.abs() < 0.1) {
-      result.add('Asymptote horizontale à gauche : y = 0.');
+      result.add('Asymptote horizontale a gauche : y = 0.');
     }
     return result.isEmpty
-        ? ['Aucune asymptote élémentaire détectée.']
+        ? ['Aucune asymptote elementaire detectee.']
         : result;
   }
 
@@ -195,28 +194,28 @@ class FunctionAnalysisService {
     final l = _engine.evaluate(expr, xMin);
     final r = _engine.evaluate(expr, xMax);
     String value(double? v) {
-      if (v == null) return 'non définie';
-      if (v.abs() > 1e6) return '±∞';
+      if (v == null) return 'non definie';
+      if (v.abs() > 1e6) return '+/-inf';
       return _fmt(v);
     }
 
-    return 'Limite près de la borne gauche (x≈${_fmt(xMin)}) : ${value(l)}\n'
-        'Limite près de la borne droite (x≈${_fmt(xMax)}) : ${value(r)}\n'
+    return 'Limite pres de la borne gauche (x~${_fmt(xMin)}) : ${value(l)}\n'
+        'Limite pres de la borne droite (x~${_fmt(xMax)}) : ${value(r)}\n'
         'Les asymptotes indiquent les comportements aux bornes interdites.';
   }
 
   String _period(String expr) {
-    if (expr.contains('tan(x)')) return 'π (tangente).';
-    if (expr.contains('sin(x)') || expr.contains('cos(x)')) return '2π.';
-    return 'Non périodique détectée.';
+    if (expr.contains('tan(x)')) return 'pi (tangente).';
+    if (expr.contains('sin(x)') || expr.contains('cos(x)')) return '2pi.';
+    return 'Non periodique detectee.';
   }
 
   String _symmetry(String expr) {
     final even = _compare(expr, expr.replaceAll('x', '(-x)'));
     final odd = _compare(expr, '-(${expr.replaceAll('x', '(-x)')})');
-    if (even) return 'Paire : axe de symétrie (Oy).';
-    if (odd) return 'Impaire : centre de symétrie (O).';
-    return 'Aucune parité détectée automatiquement.';
+    if (even) return 'Paire : axe de symetrie (Oy).';
+    if (odd) return 'Impaire : centre de symetrie (O).';
+    return 'Aucune parite detectee automatiquement.';
   }
 
   bool _compare(String a, String b) {
@@ -230,7 +229,7 @@ class FunctionAnalysisService {
 
   String _variation(String derivative, List<MapEntry<double, double>> points) {
     if (points.length < 2) {
-      return 'Données insuffisantes pour le tableau de variation.';
+      return 'Donnees insuffisantes pour le tableau de variation.';
     }
     final rows = <String>[
       'x        | signe de f\' | variation',
@@ -282,10 +281,13 @@ Variation : le signe de f' determine les intervalles croissants et decroissants.
 Periodicite : $period
 Parite : $symmetry''';
 
-  String _fmt(double value) => value.abs() < 1e-9
-      ? '0'
-      : value
-          .toStringAsFixed(3)
-          .replaceFirst(RegExp(r'0+\$'), '')
-          .replaceFirst(RegExp(r'\.\$'), '');
+  String _fmt(double value) {
+    if (value.abs() < 1e-9) return '0';
+    var s = value.toStringAsFixed(3);
+    while (s.endsWith('0')) {
+      s = s.substring(0, s.length - 1);
+    }
+    if (s.endsWith('.')) s = s.substring(0, s.length - 1);
+    return s;
+  }
 }

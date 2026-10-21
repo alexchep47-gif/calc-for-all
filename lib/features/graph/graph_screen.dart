@@ -1,14 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import 'dart:ui' as ui;
 
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../data/services/graph_service.dart';
 import '../../data/services/function_analysis_service.dart';
@@ -26,9 +26,8 @@ class _GraphScreenState extends State<GraphScreen>
   final GraphService _graphService = GraphService();
   final FunctionAnalysisService _analysisService = FunctionAnalysisService();
   final MathExpressionEngine _engine = MathExpressionEngine();
-  final TextEditingController _funcController = TextEditingController(
-    text: 'sin(x)',
-  );
+  final TextEditingController _funcController =
+      TextEditingController(text: 'sin(x)');
 
   List<FlSpot> _spots = [];
   FunctionStudyResult? _study;
@@ -78,41 +77,35 @@ class _GraphScreenState extends State<GraphScreen>
       _loading = true;
       _error = '';
     });
-
     await Future.delayed(const Duration(milliseconds: 80));
-
     final expr = _funcController.text.trim();
     if (expr.isEmpty) {
       setState(() {
-        _error = 'Entre une fonction (ex: ln(2x+1), sin(x), x^2)';
+        _error = 'Entre une fonction (ex: ln(2x+1))';
         _loading = false;
       });
       return;
     }
-
     try {
       if (_autoDomain) {
         final suggested = _engine.suggestDomain(expr);
         _xMin = suggested.xMin;
         _xMax = suggested.xMax;
       }
-
       final points = _graphService.evaluateFunction(expr, _xMin, _xMax, 400);
       final study = _analysisService.analyze(expr, xMin: _xMin, xMax: _xMax);
-
       setState(() {
         _spots = points.map((e) => FlSpot(e.key, e.value)).toList();
         _study = study;
         _loading = false;
         if (_spots.isEmpty) {
           _error =
-              'Aucun point calculable sur [${_xMin.toStringAsFixed(2)} ; ${_xMax.toStringAsFixed(2)}].\n'
-              'Verifie l\'ecriture (ex: ln(2x+1)) et le domaine.';
+              'Aucun point calculable. Verifie l ecriture et le domaine.';
         }
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        _error = 'Expression invalide. Essaie : ln(2x+1), sin(x), 1/x, x^2';
+        _error = 'Expression invalide';
         _loading = false;
         _spots = [];
         _study = null;
@@ -120,16 +113,86 @@ class _GraphScreenState extends State<GraphScreen>
     }
   }
 
+  String _toLatex(String expr) {
+    var s = expr
+        .replaceAll('ln', r'\ln')
+        .replaceAll('log', r'\log')
+        .replaceAll('sin', r'\sin')
+        .replaceAll('cos', r'\cos')
+        .replaceAll('tan', r'\tan')
+        .replaceAll('sqrt', r'\sqrt')
+        .replaceAll('*', r' \cdot ')
+        .replaceAll('pi', r'\pi');
+    s = s.replaceAllMapped(RegExp(r'\^(\d+)'), (m) => '^{${m[1]}}');
+    s = s.replaceAllMapped(RegExp(r'\^\(([^)]+)\)'), (m) => '^{${m[1]}}');
+    return s;
+  }
+
+  Future<void> _exportLatex() async {
+    if (_study == null) return;
+    final latex = StringBuffer()
+      ..writeln(r'\documentclass{article}')
+      ..writeln(r'\usepackage{amsmath}')
+      ..writeln(r'\begin{document}')
+      ..writeln(r'\section*{Etude de fonction}')
+      ..writeln(
+          r'\[ f(x) = ' + _toLatex(_study!.expression) + r' \]')
+      ..writeln(r'\subsection*{Domaine}')
+      ..writeln(_study!.domain)
+      ..writeln(r'\subsection*{Derivee}')
+      ..writeln(
+          r"\[ f'(x) = " + _toLatex(_study!.derivative) + r' \]')
+      ..writeln(r'\subsection*{Limites}')
+      ..writeln(_study!.limits)
+      ..writeln(r'\subsection*{Extremums}')
+      ..writeln(_study!.extrema.join(r' \\'))
+      ..writeln(r'\subsection*{Asymptotes}')
+      ..writeln(_study!.asymptotes.join(r' \\'))
+      ..writeln(r'\end{document}');
+
+    await Share.share(
+      latex.toString(),
+      subject: 'etude_fonction.tex',
+    );
+  }
+
+  Future<void> _exportPng() async {
+    final renderObject = _chartKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderRepaintBoundary) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ouvre l onglet Graphique puis reessaie'),
+          ),
+        );
+      }
+      return;
+    }
+    final image = await renderObject.toImage(pixelRatio: 3.0);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (bytes == null) return;
+
+    final data = bytes.buffer.asUint8List();
+    await Share.shareXFiles(
+      [
+        XFile.fromData(
+          data,
+          mimeType: 'image/png',
+          name: 'courbe_${_funcController.text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}.png',
+        ),
+      ],
+      text: 'Courbe f(x) = ${_funcController.text}',
+    );
+  }
+
   Future<void> _exportPdf() async {
     if (_study == null) return;
-
     try {
-      final regular = pw.Font.ttf(
-        await rootBundle.load('assets/DejaVuSans.ttf'),
-      );
-      final bold = pw.Font.ttf(
-        await rootBundle.load('assets/DejaVuSans-Bold.ttf'),
-      );
+      final regular =
+          pw.Font.ttf(await rootBundle.load('assets/DejaVuSans.ttf'));
+      final bold =
+          pw.Font.ttf(await rootBundle.load('assets/DejaVuSans-Bold.ttf'));
 
       pw.MemoryImage? chartImage;
       final renderObject = _chartKey.currentContext?.findRenderObject();
@@ -147,83 +210,34 @@ class _GraphScreenState extends State<GraphScreen>
       final heading = pw.TextStyle(font: bold, fontSize: 13);
 
       String safe(String s) => s
-          .replaceAll("'", "'")
           .replaceAll('−', '-')
           .replaceAll('∞', 'inf')
-          .replaceAll('π', 'pi')
-          .replaceAll('·', '.')
-          .replaceAll('≥', '>=')
-          .replaceAll('≤', '<=');
+          .replaceAll('π', 'pi');
 
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           theme: pw.ThemeData.withFont(base: regular, bold: bold),
           build: (context) => [
-            pw.Header(
-              level: 0,
-              child: pw.Text(
-                'Etude de fonction - Calc For All',
-                style: pw.TextStyle(font: bold, fontSize: 18),
-              ),
-            ),
+            pw.Text('Etude de fonction - Calc For All',
+                style: pw.TextStyle(font: bold, fontSize: 18)),
             pw.SizedBox(height: 12),
-            pw.Text(
-              'Fonction : f(x) = ${safe(_study!.expression)}',
-              style: pw.TextStyle(font: bold, fontSize: 14),
-            ),
-            pw.SizedBox(height: 14),
-            pw.Text('1. Domaine de definition', style: heading),
+            pw.Text('f(x) = ${safe(_study!.expression)}',
+                style: pw.TextStyle(font: bold, fontSize: 14)),
+            pw.SizedBox(height: 10),
+            pw.Text('Domaine', style: heading),
             pw.Text(safe(_study!.domain), style: base),
-            pw.SizedBox(height: 10),
-            pw.Text('2. Derivee symbolique', style: heading),
             pw.Text("f'(x) = ${safe(_study!.derivative)}", style: base),
-            pw.SizedBox(height: 10),
-            pw.Text('3. Limites', style: heading),
             pw.Text(safe(_study!.limits), style: base),
-            pw.SizedBox(height: 10),
-            pw.Text('4. Extremums', style: heading),
             ..._study!.extrema.map((e) => pw.Text('- ${safe(e)}', style: base)),
-            pw.SizedBox(height: 10),
-            pw.Text('5. Asymptotes', style: heading),
             ..._study!.asymptotes
                 .map((e) => pw.Text('- ${safe(e)}', style: base)),
-            pw.SizedBox(height: 10),
-            pw.Text('6. Periodicite et parite', style: heading),
-            pw.Text(
-              '${safe(_study!.period)} ${safe(_study!.symmetry)}',
-              style: base,
-            ),
-            pw.SizedBox(height: 14),
-            pw.Text('7. Tableau de variation', style: heading),
-            pw.Text(
-              safe(_study!.variationTable),
-              style: pw.TextStyle(font: regular, fontSize: 8),
-            ),
-            pw.SizedBox(height: 14),
-            pw.Text('8. Courbe', style: heading),
             if (chartImage != null)
               pw.Container(
-                height: 230,
+                height: 220,
                 child: pw.Image(chartImage, fit: pw.BoxFit.contain),
-              )
-            else
-              pw.Text(
-                '(Courbe non disponible - ouvre l onglet Graphique puis reexporte)',
-                style: base,
               ),
-            pw.SizedBox(height: 12),
-            pw.Text('Explications', style: heading),
             pw.Text(safe(_study!.explanations), style: base),
-            pw.SizedBox(height: 16),
-            pw.Text(
-              'Genere par Calc For All',
-              style: pw.TextStyle(
-                font: regular,
-                fontSize: 9,
-                color: PdfColors.grey,
-              ),
-            ),
           ],
         ),
       );
@@ -235,10 +249,47 @@ class _GraphScreenState extends State<GraphScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur export PDF : $e')),
+          SnackBar(content: Text('Erreur PDF : $e')),
         );
       }
     }
+  }
+
+  void _showExportMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('Exporter PDF'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportPdf();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.image),
+              title: const Text('Exporter PNG (courbe)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportPng();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('Exporter LaTeX'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportLatex();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -249,15 +300,12 @@ class _GraphScreenState extends State<GraphScreen>
       appBar: AppBar(
         title: const Text('Etude de fonction'),
         actions: [
-          TextButton(
-            onPressed: _loadExample,
-            child: const Text('Exemple'),
-          ),
+          TextButton(onPressed: _loadExample, child: const Text('Exemple')),
           if (_study != null)
             IconButton(
-              icon: const Icon(Icons.picture_as_pdf),
-              tooltip: 'Exporter PDF',
-              onPressed: _exportPdf,
+              icon: const Icon(Icons.ios_share),
+              tooltip: 'Exporter',
+              onPressed: _showExportMenu,
             ),
         ],
         bottom: TabBar(
@@ -279,7 +327,7 @@ class _GraphScreenState extends State<GraphScreen>
                     controller: _funcController,
                     decoration: InputDecoration(
                       labelText: 'f(x) =',
-                      hintText: 'ex: ln(2x+1), sin(x), x^2',
+                      hintText: 'ex: ln(2x+1)',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -310,8 +358,7 @@ class _GraphScreenState extends State<GraphScreen>
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1),
-
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -347,17 +394,13 @@ class _GraphScreenState extends State<GraphScreen>
               ],
             ),
           ),
-
           if (_error.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text(
-                _error,
-                style: const TextStyle(color: Colors.red, height: 1.3),
-                textAlign: TextAlign.center,
-              ),
+              child: Text(_error,
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center),
             ),
-
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -377,9 +420,7 @@ class _GraphScreenState extends State<GraphScreen>
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: Text(label),
       ),
@@ -428,126 +469,85 @@ class _GraphScreenState extends State<GraphScreen>
             minX: _xMin,
             maxX: _xMax,
           ),
-        ).animate().fadeIn(duration: 400.ms),
+        ),
       ),
     );
   }
 
   Widget _buildStudy() {
     if (_study == null) {
-      return const Center(
-        child: Text('Analyse une fonction pour voir l etude'),
-      );
+      return const Center(child: Text('Analyse une fonction'));
     }
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _section('Fonction', 'f(x) = ${_study!.expression}', Icons.functions),
-        _section('Domaine de definition', _study!.domain, Icons.domain),
-        _section(
-          'Derivee symbolique',
-          "f'(x) = ${_study!.derivative}",
-          Icons.functions,
-        ),
+        _section('Domaine', _study!.domain, Icons.domain),
+        _section('Derivee', "f'(x) = ${_study!.derivative}", Icons.functions),
         _section('Limites', _study!.limits, Icons.compare_arrows),
-        _section('Periodicite', _study!.period, Icons.loop),
         _sectionList('Extremums', _study!.extrema, Icons.trending_up),
-        _sectionList(
-          'Asymptotes',
-          _study!.asymptotes,
-          Icons.vertical_align_center,
-        ),
+        _sectionList('Asymptotes', _study!.asymptotes, Icons.vertical_align_center),
         _section('Symetrie', _study!.symmetry, Icons.swap_horiz),
-        _section(
-          'Tableau de variation (extrait)',
-          _study!.variationTable,
-          Icons.table_chart,
-        ),
-        _section(
-          'Explications detaillees',
-          _study!.explanations,
-          Icons.menu_book,
-        ),
-        const SizedBox(height: 20),
+        _section('Tableau de variation', _study!.variationTable, Icons.table_chart),
+        _section('Explications', _study!.explanations, Icons.menu_book),
+        const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: _exportPdf,
-          icon: const Icon(Icons.picture_as_pdf),
-          label: const Text('Exporter le plan d etude en PDF'),
+          onPressed: _showExportMenu,
+          icon: const Icon(Icons.ios_share),
+          label: const Text('Exporter (PDF / PNG / LaTeX)'),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(52),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-        ).animate().fadeIn(delay: 200.ms),
+        ),
         const SizedBox(height: 30),
       ],
-    ).animate().fadeIn(duration: 350.ms);
+    );
   }
 
   Widget _section(String title, String content, IconData icon) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
+            Row(children: [
+              Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+              const SizedBox(width: 8),
+              Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ]),
             const SizedBox(height: 8),
             Text(content, style: const TextStyle(height: 1.4)),
           ],
         ),
       ),
-    ).animate().fadeIn(duration: 300.ms).slideX(begin: 0.05);
+    );
   }
 
   Widget _sectionList(String title, List<String> items, IconData icon) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
+            Row(children: [
+              Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+              const SizedBox(width: 8),
+              Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ]),
             const SizedBox(height: 8),
-            ...items.map(
-              (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text('• $e'),
-              ),
-            ),
+            ...items.map((e) => Text('• $e')),
           ],
         ),
       ),
-    ).animate().fadeIn(duration: 300.ms).slideX(begin: 0.05);
+    );
   }
 }

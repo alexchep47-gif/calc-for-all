@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
 
-/// Module Probabilités : permutations, arrangements, combinaisons
+/// Probabilités : combinatoire + lois binomiale et normale
 class ProbabilityScreen extends StatefulWidget {
   const ProbabilityScreen({super.key});
 
@@ -13,14 +13,21 @@ class ProbabilityScreen extends StatefulWidget {
 class _ProbabilityScreenState extends State<ProbabilityScreen> {
   final TextEditingController _nController = TextEditingController();
   final TextEditingController _kController = TextEditingController();
+  final TextEditingController _pController = TextEditingController(text: '0.5');
+  final TextEditingController _muController = TextEditingController(text: '0');
+  final TextEditingController _sigmaController = TextEditingController(text: '1');
+  final TextEditingController _xController = TextEditingController(text: '0');
+
   String _result = '';
   String _steps = '';
-  String _mode = 'combinaison'; // permutation, arrangement, combinaison
+  String _mode = 'combinaison'; // combinaison, arrangement, permutation, binomiale, normale
 
-  int? _parse(String s) => int.tryParse(s.trim());
+  int? _parseInt(String s) => int.tryParse(s.trim());
+  double? _parseDouble(String s) =>
+      double.tryParse(s.trim().replaceAll(',', '.'));
 
   BigInt _factorial(int n) {
-    if (n < 0) return BigInt.from(0);
+    if (n < 0) return BigInt.zero;
     BigInt res = BigInt.one;
     for (int i = 2; i <= n; i++) {
       res *= BigInt.from(i);
@@ -28,9 +35,119 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
     return res;
   }
 
+  BigInt _comb(int n, int k) {
+    if (k < 0 || k > n) return BigInt.zero;
+    if (k > n - k) k = n - k;
+    BigInt res = BigInt.one;
+    for (int i = 0; i < k; i++) {
+      res = res * BigInt.from(n - i) ~/ BigInt.from(i + 1);
+    }
+    return res;
+  }
+
+  void _loadExample() {
+    setState(() {
+      switch (_mode) {
+        case 'combinaison':
+          _nController.text = '10';
+          _kController.text = '3';
+          break;
+        case 'arrangement':
+          _nController.text = '8';
+          _kController.text = '3';
+          break;
+        case 'permutation':
+          _nController.text = '6';
+          break;
+        case 'binomiale':
+          _nController.text = '10';
+          _kController.text = '4';
+          _pController.text = '0.5';
+          break;
+        case 'normale':
+          _muController.text = '0';
+          _sigmaController.text = '1';
+          _xController.text = '1.96';
+          break;
+      }
+      _result = '';
+      _steps = '';
+    });
+  }
+
+  /// Approximation de Φ(z) (loi normale centrée réduite)
+  double _phi(double z) {
+    // Approximation de Hart / rational
+    final t = 1.0 / (1.0 + 0.2316419 * z.abs());
+    final d = 0.3989423 * math.exp(-z * z / 2);
+    final p = d *
+        t *
+        (0.3193815 +
+            t *
+                (-0.3565638 +
+                    t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    return z >= 0 ? 1 - p : p;
+  }
+
   void _calculate() {
-    final n = _parse(_nController.text);
-    final k = _parse(_kController.text);
+    final buffer = StringBuffer();
+
+    if (_mode == 'binomiale') {
+      final n = _parseInt(_nController.text);
+      final k = _parseInt(_kController.text);
+      final p = _parseDouble(_pController.text);
+      if (n == null || k == null || p == null || n < 0 || k < 0 || k > n ||
+          p < 0 || p > 1) {
+        setState(() {
+          _result = 'Paramètres invalides';
+          _steps = 'n ≥ k ≥ 0 et 0 ≤ p ≤ 1';
+        });
+        return;
+      }
+      final c = _comb(n, k).toDouble();
+      final prob = c * math.pow(p, k) * math.pow(1 - p, n - k);
+      buffer.writeln('Loi binomiale B(n, p)');
+      buffer.writeln('P(X = k) = C(n,k) × p^k × (1-p)^(n-k)');
+      buffer.writeln('n = $n, k = $k, p = $p');
+      buffer.writeln('C($n,$k) = $c');
+      buffer.writeln('P(X = $k) ≈ ${prob.toStringAsFixed(8)}');
+      setState(() {
+        _result = prob.toStringAsFixed(8);
+        _steps = buffer.toString();
+      });
+      return;
+    }
+
+    if (_mode == 'normale') {
+      final mu = _parseDouble(_muController.text) ?? 0;
+      final sigma = _parseDouble(_sigmaController.text) ?? 1;
+      final x = _parseDouble(_xController.text) ?? 0;
+      if (sigma <= 0) {
+        setState(() {
+          _result = 'σ doit être > 0';
+          _steps = '';
+        });
+        return;
+      }
+      final z = (x - mu) / sigma;
+      final density =
+          (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-0.5 * z * z);
+      final cdf = _phi(z);
+      buffer.writeln('Loi normale N(μ, σ²)');
+      buffer.writeln('μ = $mu, σ = $sigma, x = $x');
+      buffer.writeln('z = (x − μ) / σ = $z');
+      buffer.writeln('Densité f(x) ≈ ${density.toStringAsFixed(8)}');
+      buffer.writeln('P(X ≤ x) = Φ(z) ≈ ${cdf.toStringAsFixed(8)}');
+      setState(() {
+        _result =
+            'f(x) ≈ ${density.toStringAsFixed(6)}\nP(X≤x) ≈ ${cdf.toStringAsFixed(6)}';
+        _steps = buffer.toString();
+      });
+      return;
+    }
+
+    final n = _parseInt(_nController.text);
+    final k = _parseInt(_kController.text);
 
     if (n == null || n < 0) {
       setState(() {
@@ -56,57 +173,22 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
       return;
     }
 
-    final buffer = StringBuffer();
     BigInt value;
-
     switch (_mode) {
       case 'permutation':
-        // n!
         value = _factorial(n);
-        buffer.writeln('Formule : P(n) = n!');
-        buffer.writeln('P($n) = $n!');
-        buffer.writeln();
-        buffer.writeln('Calcul :');
-        if (n <= 12) {
-          buffer.write('$n! = ');
-          for (int i = n; i >= 1; i--) {
-            buffer.write(i);
-            if (i > 1) buffer.write(' × ');
-          }
-          buffer.writeln();
-        }
+        buffer.writeln('Formule : n!');
         buffer.writeln('Résultat = $value');
         break;
-
       case 'arrangement':
-        // A(n,k) = n! / (n-k)!
         value = _factorial(n) ~/ _factorial(n - k!);
-        buffer.writeln('Formule : A(n, k) = n! / (n − k)!');
-        buffer.writeln('A($n, $k) = $n! / (${n - k})!');
-        buffer.writeln();
-        buffer.writeln('Étapes :');
-        buffer.writeln('1. Calculer $n! = ${_factorial(n)}');
-        buffer.writeln('2. Calculer (${n - k})! = ${_factorial(n - k)}');
-        buffer.writeln('3. Diviser : ${_factorial(n)} ÷ ${_factorial(n - k)}');
-        buffer.writeln();
-        buffer.writeln('Résultat = $value');
+        buffer.writeln('A(n,k) = n! / (n−k)!');
+        buffer.writeln('A($n,$k) = $value');
         break;
-
-      case 'combinaison':
       default:
-        // C(n,k) = n! / (k! × (n-k)!)
-        value = _factorial(n) ~/ (_factorial(k!) * _factorial(n - k));
-        buffer.writeln('Formule : C(n, k) = n! / (k! × (n − k)!)');
-        buffer.writeln('C($n, $k) = $n! / ($k! × (${n - k})!)');
-        buffer.writeln();
-        buffer.writeln('Étapes :');
-        buffer.writeln('1. Calculer $n! = ${_factorial(n)}');
-        buffer.writeln('2. Calculer $k! = ${_factorial(k)}');
-        buffer.writeln('3. Calculer (${n - k})! = ${_factorial(n - k)}');
-        buffer.writeln('4. Multiplier k! × (n−k)! = ${_factorial(k) * _factorial(n - k)}');
-        buffer.writeln('5. Diviser : ${_factorial(n)} ÷ ${_factorial(k) * _factorial(n - k)}');
-        buffer.writeln();
-        buffer.writeln('Résultat = $value');
+        value = _comb(n, k!);
+        buffer.writeln('C(n,k) = n! / (k! × (n−k)!)');
+        buffer.writeln('C($n,$k) = $value');
         break;
     }
 
@@ -119,95 +201,161 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Probabilités')),
+      appBar: AppBar(
+        title: const Text('Probabilités'),
+        actions: [
+          TextButton(onPressed: _loadExample, child: const Text('Exemple')),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Choix du type
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'combinaison', label: Text('C(n,k)')),
-              ButtonSegment(value: 'arrangement', label: Text('A(n,k)')),
-              ButtonSegment(value: 'permutation', label: Text('n!')),
-            ],
-            selected: {_mode},
-            onSelectionChanged: (s) => setState(() => _mode = s.first),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'combinaison', label: Text('C(n,k)')),
+                ButtonSegment(value: 'arrangement', label: Text('A(n,k)')),
+                ButtonSegment(value: 'permutation', label: Text('n!')),
+                ButtonSegment(value: 'binomiale', label: Text('Binom.')),
+                ButtonSegment(value: 'normale', label: Text('Normale')),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (s) => setState(() {
+                _mode = s.first;
+                _result = '';
+                _steps = '';
+              }),
+            ),
           ).animate().fadeIn(),
           const SizedBox(height: 20),
 
-          TextField(
-            controller: _nController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'n (total d’éléments)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-          if (_mode != 'permutation') ...[
-            const SizedBox(height: 12),
+          if (_mode == 'normale') ...[
             TextField(
-              controller: _kController,
-              keyboardType: TextInputType.number,
+              controller: _muController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true, signed: true),
               decoration: InputDecoration(
-                labelText: 'k (éléments choisis)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                labelText: 'μ (moyenne)',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _sigmaController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'σ (écart-type)',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _xController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true, signed: true),
+              decoration: InputDecoration(
+                labelText: 'x',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ] else ...[
+            TextField(
+              controller: _nController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: _mode == 'binomiale' ? 'n (essais)' : 'n',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+            if (_mode != 'permutation') ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _kController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText:
+                      _mode == 'binomiale' ? 'k (succès)' : 'k',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
+            if (_mode == 'binomiale') ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _pController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'p (proba de succès)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
           ],
+
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _calculate,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             child: const Text('Calculer', style: TextStyle(fontSize: 17)),
           ),
-          const SizedBox(height: 24),
-
           if (_result.isNotEmpty) ...[
+            const SizedBox(height: 24),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(18),
-                child: Column(
-                  children: [
-                    const Text('Résultat', style: TextStyle(color: Colors.grey)),
-                    const SizedBox(height: 6),
-                    Text(
-                      _result,
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                child: Text(
+                  _result,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ).animate().fadeIn().scale(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Explications pas-à-pas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text(
+                      'Explications',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                     const SizedBox(height: 10),
-                    Text(_steps, style: const TextStyle(height: 1.45, fontFamily: 'monospace', fontSize: 13)),
+                    Text(
+                      _steps,
+                      style: const TextStyle(height: 1.45, fontSize: 13),
+                    ),
                   ],
                 ),
               ),
-            ).animate().fadeIn(delay: 150.ms),
+            ).animate().fadeIn(delay: 100.ms),
           ],
-
-          const SizedBox(height: 20),
-          const Text(
-            'Rappel :\n'
-            '• Combinaison C(n,k) → l’ordre ne compte pas\n'
-            '• Arrangement A(n,k) → l’ordre compte\n'
-            '• Permutation n! → tous les rangements possibles',
-            style: TextStyle(color: Colors.grey, height: 1.4),
-          ),
         ],
       ),
     );

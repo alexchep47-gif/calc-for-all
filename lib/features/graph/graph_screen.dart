@@ -56,7 +56,14 @@ class _GraphScreenState extends State<GraphScreen>
   final GlobalKey _chartKey = GlobalKey();
 
   static const _examples = [
-    'sin(x)', 'cos(x)', 'x^3-3*x', 'a*x^2+b*x+c', 'ln(2x+1)', '(2x+1)/(x-3)',
+    'sin(x)',
+    'cos(x)',
+    'x^3-3*x',
+    'a*x^2+b*x+c',
+    'ln(2x+1)',
+    '(2x+1)/(x-3)',
+    'sqrt(x)',
+    '1/x',
   ];
   int _exampleIndex = 0;
 
@@ -154,6 +161,11 @@ class _GraphScreenState extends State<GraphScreen>
         _yMin = w.yMin;
         _yMax = w.yMax;
         _piLabels = w.piLabels;
+        // Restreindre strictement au domaine reel
+        final clamped =
+            _graphService.clampToDomain(exprs.first, _xMin, _xMax);
+        _xMin = clamped.xMin;
+        _xMax = clamped.xMax;
       }
       var ymin = double.infinity;
       var ymax = -double.infinity;
@@ -190,6 +202,13 @@ class _GraphScreenState extends State<GraphScreen>
         _xMax = xMid + span / 2;
         _yMin = yMid - span / 2;
         _yMax = yMid + span / 2;
+        // Re-clamp apres orthonorme pour ne pas reintroduire hors domaine
+        final clamped2 =
+            _graphService.clampToDomain(exprs.first, _xMin, _xMax);
+        // Garder orthonorme mais ne tracer que dans domaine : X peut etre plus large,
+        // les segments ignoreront hors domaine
+        _xMin = math.min(_xMin, clamped2.xMin);
+        _xMax = math.max(_xMax, clamped2.xMax);
       }
       final allSegs2 = <List<List<MapEntry<double, double>>>>[];
       for (final expr in exprs) {
@@ -202,9 +221,7 @@ class _GraphScreenState extends State<GraphScreen>
         _allSegments = allSegs2;
         _study = study;
         _loading = false;
-        if (allSegs2.every((s) => s.isEmpty)) {
-          _error = 'Aucun point calculable.';
-        }
+        _error = '';
       });
     } catch (_) {
       setState(() {
@@ -232,7 +249,9 @@ class _GraphScreenState extends State<GraphScreen>
     final y = _engine.evaluate(_withParams(_primaryExpr), x);
     setState(() {
       _traceX = x;
-      _traceY = (y != null && y.isFinite) ? MathLibrary.clean(y) : null;
+      _traceY = (y != null && y.isFinite && y.abs() < 1e5)
+          ? MathLibrary.clean(y)
+          : null;
     });
   }
 
@@ -360,7 +379,7 @@ class _GraphScreenState extends State<GraphScreen>
                         child: TextField(
                           controller: _exprCtrls[i],
                           decoration: InputDecoration(
-                            hintText: 'sin(x)  ou  x^3-3*x',
+                            hintText: 'sin(x)  ou  ln(x)  ou  sqrt(x)',
                             isDense: true,
                             border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10)),
@@ -482,7 +501,7 @@ class _GraphScreenState extends State<GraphScreen>
               child: Text(
                 _traceY != null
                     ? 'x = ${_fmtTraceX(_traceX!)}    y = ${_fmtTraceY(_traceY!)}'
-                    : 'x = ${_fmtTraceX(_traceX!)}  (hors domaine)',
+                    : 'x = ${_fmtTraceX(_traceX!)}  — f non définie ici',
                 style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
@@ -524,7 +543,12 @@ class _GraphScreenState extends State<GraphScreen>
 
   Widget _buildChart() {
     if (_allSegments.isEmpty || _allSegments.every((s) => s.isEmpty)) {
-      return const Center(child: Text('Aucune courbe'));
+      return const Center(
+        child: Text(
+          'Aucun point dans le domaine sur cette fenêtre.\nEssaie Reset ou une autre expression.',
+          textAlign: TextAlign.center,
+        ),
+      );
     }
     return RepaintBoundary(
       key: _chartKey,
@@ -711,7 +735,6 @@ class _DesmosPainter extends CustomPainter {
       tp.paint(canvas, Offset(ox - tp.width - 6, py - tp.height / 2));
     }
 
-    // Masque de decoupe : les courbes ne debordent pas du repere
     final plotRect = Rect.fromLTWH(ox, oy, usedW, usedH);
     canvas.save();
     canvas.clipRect(plotRect);
@@ -763,7 +786,6 @@ class _DesmosPainter extends CustomPainter {
 
     canvas.restore();
 
-    // Bordure nette du repere (par-dessus le clip)
     canvas.drawRect(
       plotRect,
       Paint()

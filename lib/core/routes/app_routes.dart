@@ -16,6 +16,7 @@ import '../../features/trigonometry/unit_circle_screen.dart';
 import '../../features/sequences/sequences_screen.dart';
 import '../../features/geometry/geometry_screen.dart';
 import '../../features/exercises/exercises_screen.dart';
+import '../../features/library/math_library_screen.dart';
 
 class AppRoutes {
   static const String onboarding = '/';
@@ -35,6 +36,7 @@ class AppRoutes {
   static const String sequences = '/sequences';
   static const String geometry = '/geometry';
   static const String exercises = '/exercises';
+  static const String library = '/library';
 
   static Map<String, WidgetBuilder> get routes => {
         onboarding: (context) => const OnboardingScreen(),
@@ -54,5 +56,6 @@ class AppRoutes {
         sequences: (context) => const SequencesScreen(),
         geometry: (context) => const GeometryScreen(),
         exercises: (context) => const ExercisesScreen(),
+        library: (context) => const MathLibraryScreen(),
       };
 }

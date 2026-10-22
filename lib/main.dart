@@ -1,16 +1,17 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routes/app_routes.dart';
+import 'core/l10n/locale_provider.dart';
 import 'data/storage/local_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // https://calc-for-all-web.vercel.app/app/#/home
   if (kIsWeb) {
     setUrlStrategy(HashUrlStrategy());
   }
@@ -34,19 +35,34 @@ class CalcForAllApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) {
+          final locale = LocaleProvider();
+          locale.load();
+          return locale;
+        }),
+        ChangeNotifierProvider(create: (_) {
           final storage = LocalStorage();
           storage.init();
           return storage;
         }),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
+      child: Consumer2<ThemeProvider, LocaleProvider>(
+        builder: (context, themeProvider, localeProvider, child) {
           if (!themeProvider.hasLoaded) {
             themeProvider.load();
           }
           return MaterialApp(
             title: 'Calc For All',
             debugShowCheckedModeBanner: false,
+            locale: localeProvider.locale,
+            supportedLocales: const [
+              Locale('fr'),
+              Locale('en'),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             theme: AppTheme.lightTheme,
             darkTheme:
                 themeProvider.isOled ? AppTheme.oledTheme : AppTheme.darkTheme,

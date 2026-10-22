@@ -356,11 +356,41 @@ class _GraphScreenState extends State<GraphScreen>
   }
 
   Future<ui.Image?> _captureChart() async {
-    final key = _tabController.index == 1 ? _studyKey : _chartKey;
+    return _captureBoundary(_chartKey);
+  }
+
+  Future<ui.Image?> _captureStudy() async {
+    return _captureBoundary(_studyKey);
+  }
+
+  Future<ui.Image?> _captureBoundary(GlobalKey key) async {
     final boundary =
         key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
     return boundary.toImage(pixelRatio: 3.0);
+  }
+
+  Future<ui.Image?> _captureVisibleStudyWithChart() async {
+    final study = await _captureStudy();
+    if (study == null) return null;
+
+    _tabController.animateTo(0);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final chart = await _captureChart();
+    _tabController.animateTo(1);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (chart == null) return study;
+
+    final width = math.max(study.width, chart.width);
+    final height = chart.height + study.height;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawColor(const Color(0xFFFFFFFF), BlendMode.src);
+    canvas.drawImage(chart, Offset((width - chart.width) / 2, 0), Paint());
+    canvas.drawImage(study,
+        Offset((width - study.width) / 2, chart.height.toDouble()), Paint());
+    final result = await recorder.endRecording().toImage(width, height);
+    return result;
   }
 
   Future<Uint8List> _pngWithWatermark(ui.Image image) async {
@@ -392,17 +422,30 @@ class _GraphScreenState extends State<GraphScreen>
   }
 
   Future<void> _exportImage() async {
-    final image = await _captureChart();
+    final image = _tabController.index == 1
+        ? await _captureVisibleStudyWithChart()
+        : await _captureChart();
     if (image == null) return;
     final bytes = await _pngWithWatermark(image);
-    await Share.shareXFiles([
-      XFile.fromData(bytes,
-          mimeType: 'image/png', name: 'calc-for-all-graph.png')
-    ]);
+    final name = _tabController.index == 1
+        ? 'calc-for-all-etude-et-courbe.png'
+        : 'calc-for-all-graph.png';
+    await Share.shareXFiles(
+        [XFile.fromData(bytes, mimeType: 'image/png', name: name)]);
   }
 
   Future<void> _exportPdf() async {
-    final image = await _captureChart();
+    final studyTab = _tabController.index == 1;
+    ui.Image? image;
+    if (studyTab) {
+      _tabController.animateTo(0);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      image = await _captureChart();
+      _tabController.animateTo(1);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    } else {
+      image = await _captureChart();
+    }
     if (image == null) return;
     final png = await _pngWithWatermark(image);
     final document = pw.Document();
@@ -447,7 +490,10 @@ class _GraphScreenState extends State<GraphScreen>
       ]),
     ));
     await Printing.sharePdf(
-        bytes: await document.save(), filename: 'calc-for-all-etude.pdf');
+        bytes: await document.save(),
+        filename: studyTab
+            ? 'calc-for-all-etude-et-courbe.pdf'
+            : 'calc-for-all-graph.pdf');
   }
 
   @override

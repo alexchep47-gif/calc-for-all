@@ -80,6 +80,41 @@ class FunctionAnalysisService {
     );
   }
 
+  /// Extrait le zero d'un denominateur lineaire ax+b ou (ax+b)
+  double? _linearDenomZero(String expr) {
+    // Cherche pattern / (ax+b) ou /ax+b
+    final patterns = [
+      RegExp(r'/\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)\)'),
+      RegExp(r'/\(x([-+]\d*\.?\d+)\)'),
+      RegExp(r'/\(([-+]?\d+)x\)'),
+      RegExp(r'/x([-+]\d*\.?\d+)'),
+      RegExp(r'/\(([-+]?\d*\.?\d*)\*?x\)'),
+    ];
+    for (final re in patterns) {
+      final m = re.firstMatch(expr);
+      if (m == null) continue;
+      if (m.groupCount >= 2 && m.group(2) != null) {
+        final a = _coefficient(m.group(1));
+        final b = double.tryParse(m.group(2)!) ?? 0;
+        if (a != 0) return -b / a;
+      } else if (m.groupCount >= 1) {
+        // /x+b form group1 is b, a=1
+        final g1 = m.group(1);
+        if (g1 != null && (g1.startsWith('+') || g1.startsWith('-'))) {
+          final b = double.tryParse(g1) ?? 0;
+          return -b;
+        }
+        final a = _coefficient(g1);
+        if (a != 0) return 0; // /ax  => x=0
+      }
+    }
+    if (RegExp(r'/x(?![a-z0-9.])').hasMatch(expr) ||
+        RegExp(r'/\(x\)').hasMatch(expr)) {
+      return 0;
+    }
+    return null;
+  }
+
   String _domain(String expr) {
     final log = RegExp(
       r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
@@ -89,10 +124,10 @@ class FunctionAnalysisService {
       final b = double.tryParse(log.group(2) ?? '0') ?? 0;
       final bound = -b / a;
       if (a > 0) {
-        return 'D = ]${_fmt(bound)} ; +inf[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  =>  x > ${_fmt(bound)}.';
+        return 'D = ]${_fmt(bound)} ; +inf[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0.';
       }
       if (a < 0) {
-        return 'D = ]-inf ; ${_fmt(bound)}[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0  =>  x < ${_fmt(bound)}.';
+        return 'D = ]-inf ; ${_fmt(bound)}[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0.';
       }
     }
     if (RegExp(r'log\(x\)').hasMatch(expr)) {
@@ -114,8 +149,12 @@ class FunctionAnalysisService {
       }
     }
 
+    final zero = _linearDenomZero(expr);
+    if (zero != null) {
+      return 'D = ]-inf ; ${_fmt(zero)}[ U ]${_fmt(zero)} ; +inf[  (denominateur nul en x = ${_fmt(zero)}).';
+    }
     if (expr.contains('/')) {
-      return 'D = R prive des zeros du denominateur (a determiner selon l expression).';
+      return 'D = R prive des zeros du denominateur.';
     }
     return 'D = R (aucune contrainte reelle detectee).';
   }
@@ -133,7 +172,7 @@ class FunctionAnalysisService {
     List<MapEntry<double, double>> points,
   ) {
     if (points.length < 3 || derivative.startsWith('Non')) {
-      return ['Racines de f\' non determinees automatiquement.'];
+      return ["Racines de f' non determinees automatiquement."];
     }
     final result = <String>[];
     double? lastRoot;
@@ -146,13 +185,13 @@ class FunctionAnalysisService {
         final root = da == 0 ? a.key : (a.key + b.key) / 2;
         if (lastRoot != null && (root - lastRoot).abs() < 0.08) continue;
         final kind = da > 0 && db < 0 ? 'Maximum local' : 'Minimum local';
-        result.add('$kind : f\'(${_fmt(root)}) approx 0 (changement de signe).');
+        result.add("$kind : f'(${_fmt(root)}) approx 0.");
         lastRoot = root;
         if (result.length >= 8) break;
       }
     }
     return result.isEmpty
-        ? ['Aucune racine de f\' detectee sur l intervalle etudie.']
+        ? ["Aucune racine de f' detectee sur l intervalle etudie."]
         : result;
   }
 
@@ -169,7 +208,10 @@ class FunctionAnalysisService {
     if (RegExp(r'log\(x\)').hasMatch(expr)) {
       result.add('Asymptote verticale : x = 0.');
     }
-    if (expr.contains('/')) {
+    final zero = _linearDenomZero(expr);
+    if (zero != null) {
+      result.add('Asymptote verticale : x = ${_fmt(zero)} (denominateur nul).');
+    } else if (expr.contains('/')) {
       result.add('Verticales possibles aux zeros du denominateur.');
     }
     final right = _engine.evaluate(expr, xMax);
@@ -179,6 +221,18 @@ class FunctionAnalysisService {
     }
     if (left != null && left.abs() < 0.1) {
       result.add('Asymptote horizontale a gauche : y = 0.');
+    }
+    // Quotient lineaire/lineaire -> asymptote y = a/c
+    final quot = RegExp(
+      r'\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)/\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
+    ).firstMatch(expr);
+    if (quot != null) {
+      final a = _coefficient(quot.group(1));
+      final c = _coefficient(quot.group(3));
+      if (c != 0) {
+        result.add(
+            'Asymptote horizontale : y = ${_fmt(a / c)} (degres egaux).');
+      }
     }
     return result.isEmpty
         ? ['Aucune asymptote elementaire detectee.']
@@ -232,7 +286,7 @@ class FunctionAnalysisService {
       return 'Donnees insuffisantes pour le tableau de variation.';
     }
     final rows = <String>[
-      'x        | signe de f\' | variation',
+      "x        | signe de f' | variation",
       '---------|-------------|-----------',
     ];
     final step = math.max(1, (points.length / 10).round());
@@ -268,13 +322,13 @@ class FunctionAnalysisService {
   ) =>
       '''Methode hors-ligne :
 1. Normalisation : 2x devient 2*x ; ln / In devient log (logarithme naturel).
-2. Domaine : contraintes reelles des logarithmes, racines et denominateurs.
+2. Domaine : contraintes des logarithmes, racines et denominateurs.
 3. Derivee : regles de somme, produit, quotient, puissance et fonctions usuelles.
 
 Fonction : f(x) = $expression
 Domaine : $domain
 Derivee : f'(x) = $derivative
-Racines de f' et extremums : ${extrema.join(' ; ')}
+Extremums : ${extrema.join(' ; ')}
 Limites : $limits
 Asymptotes : ${asymptotes.join(' ; ')}
 Variation : le signe de f' determine les intervalles croissants et decroissants.

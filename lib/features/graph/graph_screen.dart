@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -28,6 +27,8 @@ class _GraphScreenState extends State<GraphScreen>
   final MathExpressionEngine _engine = MathExpressionEngine();
   final TextEditingController _funcController =
       TextEditingController(text: 'sin(x)');
+  final TextEditingController _numController = TextEditingController();
+  final TextEditingController _denController = TextEditingController();
 
   List<FlSpot> _spots = [];
   FunctionStudyResult? _study;
@@ -36,6 +37,7 @@ class _GraphScreenState extends State<GraphScreen>
   String _error = '';
   bool _loading = false;
   bool _autoDomain = true;
+  bool _fractionMode = false;
   late TabController _tabController;
   final GlobalKey _chartKey = GlobalKey();
 
@@ -45,7 +47,7 @@ class _GraphScreenState extends State<GraphScreen>
     'x^2',
     '1/x',
     'sqrt(x-1)',
-    'cos(x)+x',
+    '(2x+1)/(x-3)',
   ];
   int _exampleIndex = 0;
 
@@ -60,19 +62,45 @@ class _GraphScreenState extends State<GraphScreen>
   void dispose() {
     _tabController.dispose();
     _funcController.dispose();
+    _numController.dispose();
+    _denController.dispose();
     super.dispose();
   }
 
   void _loadExample() {
     setState(() {
-      _funcController.text = _examples[_exampleIndex % _examples.length];
+      final ex = _examples[_exampleIndex % _examples.length];
       _exampleIndex++;
       _autoDomain = true;
+      if (ex.contains('/') && !ex.startsWith('ln') && !ex.startsWith('sin')) {
+        // Parse simple quotient a/b
+        final parts = ex.split('/');
+        if (parts.length == 2) {
+          _fractionMode = true;
+          _numController.text = parts[0].replaceAll('(', '').replaceAll(')', '');
+          _denController.text = parts[1].replaceAll('(', '').replaceAll(')', '');
+          _funcController.text = '(${_numController.text})/(${_denController.text})';
+        } else {
+          _fractionMode = false;
+          _funcController.text = ex;
+        }
+      } else {
+        _fractionMode = false;
+        _funcController.text = ex;
+      }
     });
     _analyze();
   }
 
+  void _applyFraction() {
+    final n = _numController.text.trim();
+    final d = _denController.text.trim();
+    if (n.isEmpty || d.isEmpty) return;
+    _funcController.text = '($n)/($d)';
+  }
+
   Future<void> _analyze() async {
+    if (_fractionMode) _applyFraction();
     setState(() {
       _loading = true;
       _error = '';
@@ -81,7 +109,7 @@ class _GraphScreenState extends State<GraphScreen>
     final expr = _funcController.text.trim();
     if (expr.isEmpty) {
       setState(() {
-        _error = 'Entre une fonction (ex: ln(2x+1))';
+        _error = 'Entre une fonction (ex: (2x+1)/(x-3))';
         _loading = false;
       });
       return;
@@ -99,8 +127,7 @@ class _GraphScreenState extends State<GraphScreen>
         _study = study;
         _loading = false;
         if (_spots.isEmpty) {
-          _error =
-              'Aucun point calculable. Verifie l ecriture et le domaine.';
+          _error = 'Aucun point calculable. Verifie l expression et le domaine.';
         }
       });
     } catch (_) {
@@ -113,21 +140,6 @@ class _GraphScreenState extends State<GraphScreen>
     }
   }
 
-  String _toLatex(String expr) {
-    var s = expr
-        .replaceAll('ln', r'\ln')
-        .replaceAll('log', r'\log')
-        .replaceAll('sin', r'\sin')
-        .replaceAll('cos', r'\cos')
-        .replaceAll('tan', r'\tan')
-        .replaceAll('sqrt', r'\sqrt')
-        .replaceAll('*', r' \cdot ')
-        .replaceAll('pi', r'\pi');
-    s = s.replaceAllMapped(RegExp(r'\^(\d+)'), (m) => '^{${m[1]}}');
-    s = s.replaceAllMapped(RegExp(r'\^\(([^)]+)\)'), (m) => '^{${m[1]}}');
-    return s;
-  }
-
   Future<void> _exportLatex() async {
     if (_study == null) return;
     final latex = StringBuffer()
@@ -135,55 +147,24 @@ class _GraphScreenState extends State<GraphScreen>
       ..writeln(r'\usepackage{amsmath}')
       ..writeln(r'\begin{document}')
       ..writeln(r'\section*{Etude de fonction}')
-      ..writeln(
-          r'\[ f(x) = ' + _toLatex(_study!.expression) + r' \]')
+      ..writeln(r'\[ f(x) = ' + _study!.expression + r' \]')
       ..writeln(r'\subsection*{Domaine}')
       ..writeln(_study!.domain)
-      ..writeln(r'\subsection*{Derivee}')
-      ..writeln(
-          r"\[ f'(x) = " + _toLatex(_study!.derivative) + r' \]')
-      ..writeln(r'\subsection*{Limites}')
-      ..writeln(_study!.limits)
-      ..writeln(r'\subsection*{Extremums}')
-      ..writeln(_study!.extrema.join(r' \\'))
-      ..writeln(r'\subsection*{Asymptotes}')
-      ..writeln(_study!.asymptotes.join(r' \\'))
       ..writeln(r'\end{document}');
-
-    await Share.share(
-      latex.toString(),
-      subject: 'etude_fonction.tex',
-    );
+    await Share.share(latex.toString(), subject: 'etude_fonction.tex');
   }
 
   Future<void> _exportPng() async {
     final renderObject = _chartKey.currentContext?.findRenderObject();
-    if (renderObject is! RenderRepaintBoundary) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ouvre l onglet Graphique puis reessaie'),
-          ),
-        );
-      }
-      return;
-    }
+    if (renderObject is! RenderRepaintBoundary) return;
     final image = await renderObject.toImage(pixelRatio: 3.0);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
     if (bytes == null) return;
-
-    final data = bytes.buffer.asUint8List();
-    await Share.shareXFiles(
-      [
-        XFile.fromData(
-          data,
-          mimeType: 'image/png',
-          name: 'courbe_${_funcController.text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}.png',
-        ),
-      ],
-      text: 'Courbe f(x) = ${_funcController.text}',
-    );
+    await Share.shareXFiles([
+      XFile.fromData(bytes.buffer.asUint8List(),
+          mimeType: 'image/png', name: 'courbe.png'),
+    ]);
   }
 
   Future<void> _exportPdf() async {
@@ -193,64 +174,30 @@ class _GraphScreenState extends State<GraphScreen>
           pw.Font.ttf(await rootBundle.load('assets/DejaVuSans.ttf'));
       final bold =
           pw.Font.ttf(await rootBundle.load('assets/DejaVuSans-Bold.ttf'));
-
-      pw.MemoryImage? chartImage;
-      final renderObject = _chartKey.currentContext?.findRenderObject();
-      if (renderObject is RenderRepaintBoundary) {
-        final image = await renderObject.toImage(pixelRatio: 2.0);
-        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-        if (bytes != null) {
-          chartImage = pw.MemoryImage(bytes.buffer.asUint8List());
-        }
-        image.dispose();
-      }
-
       final pdf = pw.Document();
-      final base = pw.TextStyle(font: regular, fontSize: 10);
-      final heading = pw.TextStyle(font: bold, fontSize: 13);
-
-      String safe(String s) => s
-          .replaceAll('−', '-')
-          .replaceAll('∞', 'inf')
-          .replaceAll('π', 'pi');
-
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          theme: pw.ThemeData.withFont(base: regular, bold: bold),
-          build: (context) => [
-            pw.Text('Etude de fonction - Calc For All',
-                style: pw.TextStyle(font: bold, fontSize: 18)),
-            pw.SizedBox(height: 12),
-            pw.Text('f(x) = ${safe(_study!.expression)}',
-                style: pw.TextStyle(font: bold, fontSize: 14)),
-            pw.SizedBox(height: 10),
-            pw.Text('Domaine', style: heading),
-            pw.Text(safe(_study!.domain), style: base),
-            pw.Text("f'(x) = ${safe(_study!.derivative)}", style: base),
-            pw.Text(safe(_study!.limits), style: base),
-            ..._study!.extrema.map((e) => pw.Text('- ${safe(e)}', style: base)),
-            ..._study!.asymptotes
-                .map((e) => pw.Text('- ${safe(e)}', style: base)),
-            if (chartImage != null)
-              pw.Container(
-                height: 220,
-                child: pw.Image(chartImage, fit: pw.BoxFit.contain),
-              ),
-            pw.Text(safe(_study!.explanations), style: base),
-          ],
-        ),
-      );
-
+      pdf.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        theme: pw.ThemeData.withFont(base: regular, bold: bold),
+        build: (context) => [
+          pw.Text('Etude de fonction - Calc For All',
+              style: pw.TextStyle(font: bold, fontSize: 18)),
+          pw.SizedBox(height: 12),
+          pw.Text('f(x) = ${_study!.expression}',
+              style: pw.TextStyle(font: bold, fontSize: 14)),
+          pw.Text(_study!.domain),
+          pw.Text("f'(x) = ${_study!.derivative}"),
+          pw.Text(_study!.limits),
+          ..._study!.extrema.map((e) => pw.Text('- $e')),
+          ..._study!.asymptotes.map((e) => pw.Text('- $e')),
+          pw.Text(_study!.explanations),
+        ],
+      ));
       await Printing.sharePdf(
-        bytes: await pdf.save(),
-        filename: 'etude_fonction.pdf',
-      );
+          bytes: await pdf.save(), filename: 'etude_fonction.pdf');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur PDF : $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erreur PDF : $e')));
       }
     }
   }
@@ -272,7 +219,7 @@ class _GraphScreenState extends State<GraphScreen>
             ),
             ListTile(
               leading: const Icon(Icons.image),
-              title: const Text('Exporter PNG (courbe)'),
+              title: const Text('Exporter PNG'),
               onTap: () {
                 Navigator.pop(ctx);
                 _exportPng();
@@ -304,7 +251,6 @@ class _GraphScreenState extends State<GraphScreen>
           if (_study != null)
             IconButton(
               icon: const Icon(Icons.ios_share),
-              tooltip: 'Exporter',
               onPressed: _showExportMenu,
             ),
         ],
@@ -318,49 +264,135 @@ class _GraphScreenState extends State<GraphScreen>
       ),
       body: Column(
         children: [
+          // Toggle mode fraction
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _funcController,
-                    decoration: InputDecoration(
-                      labelText: 'f(x) =',
-                      hintText: 'ex: ln(2x+1)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      filled: true,
-                    ),
-                    onSubmitted: (_) => _analyze(),
-                  ),
+                FilterChip(
+                  label: const Text('Barre de fraction'),
+                  selected: _fractionMode,
+                  avatar: const Icon(Icons.horizontal_rule, size: 18),
+                  onSelected: (v) => setState(() {
+                    _fractionMode = v;
+                    if (v && _numController.text.isEmpty) {
+                      _numController.text = '2x+1';
+                      _denController.text = 'x-3';
+                      _applyFraction();
+                    }
+                  }),
                 ),
-                const SizedBox(width: 10),
-                FilledButton(
-                  onPressed: _loading ? null : _analyze,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.play_arrow_rounded),
-                ),
+                const SizedBox(width: 8),
+                if (_fractionMode)
+                  Text('f(x) = num / den',
+                      style: TextStyle(
+                          color: Colors.grey.shade600, fontSize: 12)),
               ],
             ),
           ),
+          if (_fractionMode)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _numController,
+                    decoration: InputDecoration(
+                      labelText: 'Numerateur',
+                      hintText: 'ex: 2x+1',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                    ),
+                    onChanged: (_) => _applyFraction(),
+                    onSubmitted: (_) => _analyze(),
+                  ),
+                  // Barre de fraction visuelle
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  TextField(
+                    controller: _denController,
+                    decoration: InputDecoration(
+                      labelText: 'Denominateur',
+                      hintText: 'ex: x-3',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                    ),
+                    onChanged: (_) => _applyFraction(),
+                    onSubmitted: (_) => _analyze(),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'f(x) = ${_funcController.text}',
+                    style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _funcController,
+                      decoration: InputDecoration(
+                        labelText: 'f(x) =',
+                        hintText: 'ex: (2x+1)/(x-3)  ou  ln(2x+1)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        filled: true,
+                      ),
+                      onSubmitted: (_) => _analyze(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton(
+                    onPressed: _loading ? null : _analyze,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: _loading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.play_arrow_rounded),
+                  ),
+                ],
+              ),
+            ),
+          if (_fractionMode)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: FilledButton(
+                onPressed: _loading ? null : _analyze,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Analyser le quotient'),
+              ),
+            ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 _zoomBtn('-', () {
@@ -420,7 +452,8 @@ class _GraphScreenState extends State<GraphScreen>
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: Text(label),
       ),
@@ -446,11 +479,9 @@ class _GraphScreenState extends State<GraphScreen>
                 sideTitles: SideTitles(showTitles: true, reservedSize: 28),
               ),
               topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
+                  sideTitles: SideTitles(showTitles: false)),
               rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
+                  sideTitles: SideTitles(showTitles: false)),
             ),
             borderData: FlBorderData(show: true),
             lineBarsData: [
@@ -461,9 +492,7 @@ class _GraphScreenState extends State<GraphScreen>
                 barWidth: 2.5,
                 dotData: const FlDotData(show: false),
                 belowBarData: BarAreaData(
-                  show: true,
-                  color: primary.withOpacity(0.08),
-                ),
+                    show: true, color: primary.withOpacity(0.08)),
               ),
             ],
             minX: _xMin,
@@ -486,9 +515,11 @@ class _GraphScreenState extends State<GraphScreen>
         _section('Derivee', "f'(x) = ${_study!.derivative}", Icons.functions),
         _section('Limites', _study!.limits, Icons.compare_arrows),
         _sectionList('Extremums', _study!.extrema, Icons.trending_up),
-        _sectionList('Asymptotes', _study!.asymptotes, Icons.vertical_align_center),
+        _sectionList(
+            'Asymptotes', _study!.asymptotes, Icons.vertical_align_center),
         _section('Symetrie', _study!.symmetry, Icons.swap_horiz),
-        _section('Tableau de variation', _study!.variationTable, Icons.table_chart),
+        _section(
+            'Tableau de variation', _study!.variationTable, Icons.table_chart),
         _section('Explications', _study!.explanations, Icons.menu_book),
         const SizedBox(height: 16),
         FilledButton.icon(
@@ -498,8 +529,7 @@ class _GraphScreenState extends State<GraphScreen>
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(52),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+                borderRadius: BorderRadius.circular(14)),
           ),
         ),
         const SizedBox(height: 30),
@@ -519,7 +549,8 @@ class _GraphScreenState extends State<GraphScreen>
               Icon(icon, size: 20, color: Theme.of(context).primaryColor),
               const SizedBox(width: 8),
               Text(title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15)),
             ]),
             const SizedBox(height: 8),
             Text(content, style: const TextStyle(height: 1.4)),
@@ -541,7 +572,8 @@ class _GraphScreenState extends State<GraphScreen>
               Icon(icon, size: 20, color: Theme.of(context).primaryColor),
               const SizedBox(width: 8),
               Text(title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15)),
             ]),
             const SizedBox(height: 8),
             ...items.map((e) => Text('• $e')),

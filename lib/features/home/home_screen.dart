@@ -18,31 +18,30 @@ class _HomeScreenState extends State<HomeScreen> {
   static final modules = [
     _Module('Calculatrice', 'Scientifique + fractions', Icons.calculate_rounded,
         const Color(0xFF1565C0), AppRoutes.calculator),
-    _Module('Étude de fonction', 'Graphique + analyse + PDF',
+    _Module('Etude de fonction', 'Graphique + analyse + PDF',
         Icons.show_chart_rounded, const Color(0xFF2E7D32), AppRoutes.graph),
-    _Module('Solveur d’équations', 'Polynômes de degré n',
+    _Module('Bibliotheque maths', 'Toutes les formules du secondaire',
+        Icons.menu_book_rounded, const Color(0xFF283593), AppRoutes.library),
+    _Module('Solveur d equations', 'Polynomes de degre n',
         Icons.architecture_rounded, const Color(0xFF6A1B9A), AppRoutes.solver),
-    _Module('Matrices', '2×2 / 3×3 + det + inverse', Icons.grid_on_rounded,
+    _Module('Matrices', '2x2 / 3x3 + det + inverse', Icons.grid_on_rounded,
         const Color(0xFF0277BD), AppRoutes.matrices),
-    _Module('Cercle trigonométrique', 'Interactif cos / sin / tan',
+    _Module('Cercle trigonometrique', 'Angles en fractions de pi',
         Icons.radar_rounded, const Color(0xFF00838F), AppRoutes.unitCircle),
-    _Module(
-        'Suites numériques',
-        'Arithmétiques & géométriques',
-        Icons.format_list_numbered_rounded,
-        const Color(0xFF5D4037),
+    _Module('Suites numeriques', 'Arithmetiques & geometriques',
+        Icons.format_list_numbered_rounded, const Color(0xFF5D4037),
         AppRoutes.sequences),
-    _Module('Géométrie', 'Pythagore, Thalès, aires, volumes',
+    _Module('Geometrie', 'Pythagore, Thales, vecteurs 3D',
         Icons.pentagon_rounded, const Color(0xFF37474F), AppRoutes.geometry),
-    _Module('Exercices', 'Quiz avec correction détaillée', Icons.quiz_rounded,
+    _Module('Exercices', 'Quiz avec correction detaillee', Icons.quiz_rounded,
         const Color(0xFFC62828), AppRoutes.exercises),
-    _Module('Dérivée & Intégrale', 'Calcul + explications',
+    _Module('Derivee & Integrale', 'Calcul + explications',
         Icons.functions_rounded, const Color(0xFF4527A0), AppRoutes.derivative),
-    _Module('Probabilités', 'Permutations, arrangements, combinaisons',
+    _Module('Probabilites', 'C(n,k), binomiale, normale',
         Icons.casino_rounded, const Color(0xFF00695C), AppRoutes.probability),
-    _Module('Statistiques', 'Série de données + indicateurs',
+    _Module('Statistiques', 'Serie de donnees + indicateurs',
         Icons.bar_chart_rounded, const Color(0xFFEF6C00), AppRoutes.statistics),
-    _Module('Nombres complexes', 'Opérations + forme polaire',
+    _Module('Nombres complexes', 'Operations + plan complexe',
         Icons.blur_on_rounded, const Color(0xFFAD1457), AppRoutes.complex),
     _Module('Convertisseur', 'Devises, longueurs, masses…',
         Icons.swap_horiz_rounded, const Color(0xFF455A64), AppRoutes.converter),
@@ -73,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
               icon: const Icon(Icons.settings_rounded),
-              tooltip: 'Réglages',
+              tooltip: 'Reglages',
               onPressed: () =>
                   Navigator.pushNamed(context, AppRoutes.settings)),
         ],
@@ -107,21 +106,21 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: [
               _ExampleChip(
-                  label: 'Étudier ln(2x+1)',
+                  label: 'Etudier (2x+1)/(x-3)',
                   icon: Icons.show_chart,
                   route: AppRoutes.graph),
               _ExampleChip(
-                  label: 'Résoudre x²−3x+2',
-                  icon: Icons.functions,
-                  route: AppRoutes.solver),
+                  label: 'Bibliotheque',
+                  icon: Icons.menu_book,
+                  route: AppRoutes.library),
               _ExampleChip(
-                  label: 'Statistiques',
-                  icon: Icons.bar_chart,
-                  route: AppRoutes.statistics),
+                  label: 'Cercle (pi/6)',
+                  icon: Icons.radar,
+                  route: AppRoutes.unitCircle),
             ]),
             const SizedBox(height: 20),
           ],
-          Text(_query.isEmpty ? 'Modules' : 'Résultats',
+          Text(_query.isEmpty ? 'Modules' : 'Resultats',
               style: Theme.of(context)
                   .textTheme
                   .titleMedium
@@ -130,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (filtered.isEmpty)
             const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: Text('Aucun module trouvé.')))
+                child: Center(child: Text('Aucun module trouve.')))
           else
             ...filtered.asMap().entries.map((entry) => _ModuleCard(
                     module: entry.value,
@@ -205,7 +204,7 @@ class _ModuleCard extends StatelessWidget {
                 icon: Icon(
                     isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
                     color: isFavorite ? Colors.amber : null),
-                tooltip: isFavorite ? 'Retirer des favoris' : 'Épingler',
+                tooltip: isFavorite ? 'Retirer des favoris' : 'Epingle',
                 onPressed: () => storage.toggleFavorite(module.route)),
             const Icon(Icons.chevron_right_rounded),
           ]),

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/services/math_library.dart';
 
-/// Matrices : taille libre, fractions, FER / FE, opérations
+/// Matrices n×m, plusieurs matrices, fractions, FE/FER, trace, transpose
 class MatricesScreen extends StatefulWidget {
   const MatricesScreen({super.key});
 
@@ -13,9 +12,8 @@ class MatricesScreen extends StatefulWidget {
 class _MatricesScreenState extends State<MatricesScreen> {
   int _rows = 2;
   int _cols = 2;
-  int _matrixCount = 1; // 1 ou 2
-  late List<List<TextEditingController>> _aControllers;
-  late List<List<TextEditingController>> _bControllers;
+  int _matrixCount = 2;
+  late List<List<List<TextEditingController>>> _matrices; // [mat][row][col]
   String _operation = 'addition';
   String _result = '';
   String _steps = '';
@@ -27,28 +25,27 @@ class _MatricesScreenState extends State<MatricesScreen> {
   }
 
   void _initControllers() {
-    _aControllers = List.generate(
-        _rows, (_) => List.generate(_cols, (_) => TextEditingController(text: '0')));
-    _bControllers = List.generate(
-        _rows, (_) => List.generate(_cols, (_) => TextEditingController(text: '0')));
+    _matrices = List.generate(
+      _matrixCount,
+      (_) => List.generate(
+        _rows,
+        (_) => List.generate(_cols, (_) => TextEditingController(text: '0')),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    for (final row in _aControllers) {
-      for (final c in row) {
-        c.dispose();
-      }
-    }
-    for (final row in _bControllers) {
-      for (final c in row) {
-        c.dispose();
+    for (final m in _matrices) {
+      for (final row in m) {
+        for (final c in row) {
+          c.dispose();
+        }
       }
     }
     super.dispose();
   }
 
-  /// Parse "3/4", "-1/2", "2.5", "π/2"
   double _parseCell(String raw) {
     final s = raw.trim().replaceAll(',', '.').replaceAll(' ', '');
     if (s.isEmpty) return 0;
@@ -65,16 +62,14 @@ class _MatricesScreenState extends State<MatricesScreen> {
     return double.tryParse(s) ?? 0;
   }
 
-  List<List<double>> _readMatrix(List<List<TextEditingController>> ctrls) {
-    return ctrls
+  List<List<double>> _read(int index) {
+    return _matrices[index]
         .map((row) => row.map((c) => _parseCell(c.text)).toList())
         .toList();
   }
 
   String _fmt(double v) {
     if (v.isNaN) return '?';
-    final f = MathLibrary.toSimpleFraction(v);
-    if (f != null) return f;
     return MathLibrary.format(v);
   }
 
@@ -82,155 +77,35 @@ class _MatricesScreenState extends State<MatricesScreen> {
     return m.map((row) => row.map(_fmt).join('   ')).join('\n');
   }
 
-  void _resize(int rows, int cols) {
+  void _resize() {
     setState(() {
-      _rows = rows;
-      _cols = cols;
+      for (final m in _matrices) {
+        for (final row in m) {
+          for (final c in row) {
+            c.dispose();
+          }
+        }
+      }
       _initControllers();
       _result = '';
       _steps = '';
     });
   }
 
-  void _calculate() {
-    final A = _readMatrix(_aControllers);
-    final B = _matrixCount > 1 ? _readMatrix(_bControllers) : A;
-    final buffer = StringBuffer();
-
-    try {
-      if (_operation == 'addition' || _operation == 'soustraction') {
-        final isAdd = _operation == 'addition';
-        buffer.writeln(isAdd ? 'Opération : A + B' : 'Opération : A − B');
-        final R = List.generate(
-            _rows,
-            (i) => List.generate(_cols, (j) {
-                  return isAdd ? A[i][j] + B[i][j] : A[i][j] - B[i][j];
-                }));
-        buffer.writeln(_formatMatrix(R));
-        setState(() {
-          _result = _formatMatrix(R);
-          _steps = buffer.toString();
-        });
-      } else if (_operation == 'multiplication') {
-        if (_cols != _rows) {
-          // produit si B carrée compatible : A (m×n) * B (n×p) — on suppose B même taille
-        }
-        buffer.writeln('Opération : A × B');
-        final R = List.generate(
-            _rows,
-            (i) => List.generate(_cols, (j) {
-                  double sum = 0;
-                  for (int k = 0; k < _cols; k++) {
-                    sum += A[i][k] * B[k][j];
-                  }
-                  return sum;
-                }));
-        buffer.writeln(_formatMatrix(R));
-        setState(() {
-          _result = _formatMatrix(R);
-          _steps = buffer.toString();
-        });
-      } else if (_operation == 'déterminant') {
-        if (_rows != _cols) {
-          setState(() {
-            _result = 'Le déterminant exige une matrice carrée.';
-            _steps = '';
-          });
-          return;
-        }
-        final det = _determinant(A);
-        buffer.writeln('det(A) = ${_fmt(det)}');
-        setState(() {
-          _result = 'det(A) = ${_fmt(det)}';
-          _steps = buffer.toString();
-        });
-      } else if (_operation == 'inverse') {
-        if (_rows != _cols) {
-          setState(() {
-            _result = 'L\'inverse exige une matrice carrée.';
-            _steps = '';
-          });
-          return;
-        }
-        final det = _determinant(A);
-        if (det.abs() < 1e-12) {
-          setState(() {
-            _result = 'Non inversible (det = 0)';
-            _steps = 'Le déterminant est nul.';
-          });
-          return;
-        }
-        if (_rows == 2) {
-          final inv = [
-            [A[1][1] / det, -A[0][1] / det],
-            [-A[1][0] / det, A[0][0] / det],
-          ];
-          setState(() {
-            _result = _formatMatrix(inv);
-            _steps = 'A⁻¹ = (1/det) × comatrice\ndet = ${_fmt(det)}';
-          });
-        } else {
-          final inv = _gaussJordanInverse(A);
-          setState(() {
-            _result = _formatMatrix(inv);
-            _steps = 'Inverse par Gauss-Jordan\ndet = ${_fmt(det)}';
-          });
-        }
-      } else if (_operation == 'fer') {
-        // Forme échelonnée réduite (RREF)
-        final r = _rref(A.map((r) => List<double>.from(r)).toList());
-        buffer.writeln('Forme échelonnée réduite (FER / RREF) :');
-        buffer.writeln(_formatMatrix(r));
-        setState(() {
-          _result = _formatMatrix(r);
-          _steps = buffer.toString();
-        });
-      } else if (_operation == 'fe') {
-        // Forme échelonnée (REF)
-        final r = _ref(A.map((r) => List<double>.from(r)).toList());
-        buffer.writeln('Forme échelonnée (FE / REF) :');
-        buffer.writeln(_formatMatrix(r));
-        setState(() {
-          _result = _formatMatrix(r);
-          _steps = buffer.toString();
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _result = 'Erreur : $e';
-        _steps = '';
-      });
+  double _trace(List<List<double>> a) {
+    final n = math.min(a.length, a.isEmpty ? 0 : a[0].length);
+    var t = 0.0;
+    for (var i = 0; i < n; i++) {
+      t += a[i][i];
     }
+    return t;
   }
 
-  double _determinant(List<List<double>> m) {
-    final n = m.length;
-    if (n == 1) return m[0][0];
-    if (n == 2) return m[0][0] * m[1][1] - m[0][1] * m[1][0];
-    // Gauss
-    final a = m.map((r) => List<double>.from(r)).toList();
-    var det = 1.0;
-    for (var i = 0; i < n; i++) {
-      var pivot = i;
-      for (var r = i + 1; r < n; r++) {
-        if (a[r][i].abs() > a[pivot][i].abs()) pivot = r;
-      }
-      if (a[pivot][i].abs() < 1e-12) return 0;
-      if (pivot != i) {
-        final tmp = a[i];
-        a[i] = a[pivot];
-        a[pivot] = tmp;
-        det = -det;
-      }
-      det *= a[i][i];
-      for (var r = i + 1; r < n; r++) {
-        final f = a[r][i] / a[i][i];
-        for (var c = i; c < n; c++) {
-          a[r][c] -= f * a[i][c];
-        }
-      }
-    }
-    return det;
+  List<List<double>> _transpose(List<List<double>> a) {
+    if (a.isEmpty) return [];
+    final m = a.length;
+    final n = a[0].length;
+    return List.generate(n, (j) => List.generate(m, (i) => a[i][j]));
   }
 
   List<List<double>> _ref(List<List<double>> a) {
@@ -262,74 +137,117 @@ class _MatricesScreenState extends State<MatricesScreen> {
   }
 
   List<List<double>> _rref(List<List<double>> a) {
-    final ref = _ref(a);
-    final m = ref.length;
-    final n = ref[0].length;
+    a = _ref(a.map((r) => List<double>.from(r)).toList());
+    final m = a.length;
+    final n = a[0].length;
     for (var i = m - 1; i >= 0; i--) {
       var lead = -1;
       for (var j = 0; j < n; j++) {
-        if (ref[i][j].abs() > 1e-12) {
+        if (a[i][j].abs() > 1e-12) {
           lead = j;
           break;
         }
       }
       if (lead < 0) continue;
       for (var k = 0; k < i; k++) {
-        final f = ref[k][lead];
+        final f = a[k][lead];
         for (var j = 0; j < n; j++) {
-          ref[k][j] -= f * ref[i][j];
+          a[k][j] -= f * a[i][j];
         }
       }
     }
-    return ref;
+    return a;
   }
 
-  List<List<double>> _gaussJordanInverse(List<List<double>> m) {
-    final n = m.length;
-    final aug = List.generate(n, (i) {
-      return [
-        ...m[i],
-        ...List.generate(n, (j) => i == j ? 1.0 : 0.0),
-      ];
-    });
-    final r = _rref(aug);
-    return List.generate(n, (i) => r[i].sublist(n));
-  }
+  void _calculate() {
+    final mats =
+        List.generate(_matrixCount, (i) => _read(i));
+    final buffer = StringBuffer();
 
-  Widget _matrixInput(String title, List<List<TextEditingController>> ctrls) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text('Fractions acceptées : 1/2, -3/4…',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-        const SizedBox(height: 8),
-        ...List.generate(_rows, (i) {
-          return Row(
-            children: List.generate(_cols, (j) {
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: TextField(
-                    controller: ctrls[i][j],
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: true),
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                      hintText: '0',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          );
-        }),
-      ],
-    );
+    try {
+      if (_operation == 'addition' || _operation == 'soustraction') {
+        final isAdd = _operation == 'addition';
+        buffer.writeln(isAdd ? 'Somme de $_matrixCount matrices' : 'Différences successives');
+        var R = mats.first.map((r) => List<double>.from(r)).toList();
+        for (var k = 1; k < mats.length; k++) {
+          for (var i = 0; i < _rows; i++) {
+            for (var j = 0; j < _cols; j++) {
+              R[i][j] = isAdd ? R[i][j] + mats[k][i][j] : R[i][j] - mats[k][i][j];
+            }
+          }
+        }
+        buffer.writeln(_formatMatrix(R));
+        setState(() {
+          _result = _formatMatrix(R);
+          _steps = buffer.toString();
+        });
+      } else if (_operation == 'multiplication') {
+        // Produit successif A1*A2*... (nécessite cols_k = rows_{k+1})
+        var R = mats.first.map((r) => List<double>.from(r)).toList();
+        for (var k = 1; k < mats.length; k++) {
+          final A = R;
+          final B = mats[k];
+          if (A[0].length != B.length) {
+            throw Exception('Dimensions incompatibles pour le produit');
+          }
+          final m = A.length;
+          final n = B[0].length;
+          final p = B.length;
+          R = List.generate(
+              m,
+              (i) => List.generate(n, (j) {
+                    var s = 0.0;
+                    for (var t = 0; t < p; t++) {
+                      s += A[i][t] * B[t][j];
+                    }
+                    return s;
+                  }));
+        }
+        buffer.writeln('Produit de $_matrixCount matrices');
+        buffer.writeln(_formatMatrix(R));
+        setState(() {
+          _result = _formatMatrix(R);
+          _steps = buffer.toString();
+        });
+      } else if (_operation == 'trace') {
+        final lines = <String>[];
+        for (var i = 0; i < mats.length; i++) {
+          final t = _trace(mats[i]);
+          lines.add('Tr(A${i + 1}) = ${_fmt(t)}');
+        }
+        setState(() {
+          _result = lines.join('\n');
+          _steps = 'Trace = somme des éléments diagonaux';
+        });
+      } else if (_operation == 'transpose') {
+        final lines = <String>[];
+        for (var i = 0; i < mats.length; i++) {
+          lines.add('A${i + 1}ᵀ =\n${_formatMatrix(_transpose(mats[i]))}');
+        }
+        setState(() {
+          _result = lines.join('\n\n');
+          _steps = 'Transposée : aᵢⱼ → aⱼᵢ';
+        });
+      } else if (_operation == 'fe') {
+        final r = _ref(mats.first.map((r) => List<double>.from(r)).toList());
+        setState(() {
+          _result = _formatMatrix(r);
+          _steps = 'Forme échelonnée (FE / REF) de A1';
+        });
+      } else if (_operation == 'fer') {
+        final r =
+            _rref(mats.first.map((r) => List<double>.from(r)).toList());
+        setState(() {
+          _result = _formatMatrix(r);
+          _steps = 'Forme échelonnée réduite (FER / RREF) de A1';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _result = 'Erreur : $e';
+        _steps = '';
+      });
+    }
   }
 
   @override
@@ -337,70 +255,114 @@ class _MatricesScreenState extends State<MatricesScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Matrices')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         children: [
-          Text('Ordre de la matrice', style: Theme.of(context).textTheme.titleSmall),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Lignes'),
+                  const SizedBox(width: 6),
+                  DropdownButton<int>(
+                    value: _rows,
+                    items: [1, 2, 3, 4, 5]
+                        .map((e) =>
+                            DropdownMenuItem(value: e, child: Text('$e')))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      _rows = v;
+                      _resize();
+                    },
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Colonnes'),
+                  const SizedBox(width: 6),
+                  DropdownButton<int>(
+                    value: _cols,
+                    items: [1, 2, 3, 4, 5]
+                        .map((e) =>
+                            DropdownMenuItem(value: e, child: Text('$e')))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      _cols = v;
+                      _resize();
+                    },
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Nb matrices'),
+                  const SizedBox(width: 6),
+                  DropdownButton<int>(
+                    value: _matrixCount,
+                    items: [1, 2, 3, 4]
+                        .map((e) =>
+                            DropdownMenuItem(value: e, child: Text('$e')))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      _matrixCount = v;
+                      _resize();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              const Text('Lignes'),
-              Expanded(
-                child: Slider(
-                  value: _rows.toDouble(),
-                  min: 1,
-                  max: 5,
-                  divisions: 4,
-                  label: '$_rows',
-                  onChanged: (v) => _resize(v.round(), _cols),
+          const Text('Fractions acceptées (ex: 1/2, -3/4)',
+              style: TextStyle(fontSize: 12)),
+          ...List.generate(_matrixCount, (mi) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 4),
+                  child: Text('Matrice A${mi + 1}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
-              ),
-              Text('$_rows'),
-            ],
-          ),
-          Row(
-            children: [
-              const Text('Colonnes'),
-              Expanded(
-                child: Slider(
-                  value: _cols.toDouble(),
-                  min: 1,
-                  max: 5,
-                  divisions: 4,
-                  label: '$_cols',
-                  onChanged: (v) => _resize(_rows, v.round()),
-                ),
-              ),
-              Text('$_cols'),
-            ],
-          ),
-          Row(
-            children: [
-              const Text('Nombre de matrices'),
-              const SizedBox(width: 12),
-              ChoiceChip(
-                label: const Text('1'),
-                selected: _matrixCount == 1,
-                onSelected: (_) => setState(() => _matrixCount = 1),
-              ),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: const Text('2'),
-                selected: _matrixCount == 2,
-                onSelected: (_) => setState(() => _matrixCount = 2),
-              ),
-            ],
-          ),
+                ...List.generate(_rows, (i) {
+                  return Row(
+                    children: List.generate(_cols, (j) {
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: TextField(
+                            controller: _matrices[mi][i][j],
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  );
+                }),
+              ],
+            );
+          }),
           const SizedBox(height: 12),
           Wrap(
             spacing: 6,
-            runSpacing: 6,
             children: [
               for (final op in [
-                ('addition', 'A+B'),
-                ('soustraction', 'A−B'),
-                ('multiplication', 'A×B'),
-                ('déterminant', 'det'),
-                ('inverse', 'A⁻¹'),
+                ('addition', '+'),
+                ('soustraction', '−'),
+                ('multiplication', '×'),
+                ('trace', 'Tr'),
+                ('transpose', 'ᵀ'),
                 ('fe', 'FE'),
                 ('fer', 'FER'),
               ])
@@ -412,66 +374,30 @@ class _MatricesScreenState extends State<MatricesScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            _operation == 'fe'
-                ? 'FE = forme échelonnée (REF)'
-                : _operation == 'fer'
-                    ? 'FER = forme échelonnée réduite (RREF)'
-                    : '',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 16),
-          _matrixInput('Matrice A ($_rows×$_cols)', _aControllers),
-          if (_matrixCount > 1 &&
-              (_operation == 'addition' ||
-                  _operation == 'soustraction' ||
-                  _operation == 'multiplication')) ...[
-            const SizedBox(height: 16),
-            _matrixInput('Matrice B', _bControllers),
-          ],
-          const SizedBox(height: 20),
-          FilledButton(
+          FilledButton.icon(
             onPressed: _calculate,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-            ),
-            child: const Text('Calculer'),
+            icon: const Icon(Icons.calculate),
+            label: const Text('Calculer'),
           ),
           if (_result.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    const Text('Résultat',
-                        style: TextStyle(color: Colors.grey)),
-                    const SizedBox(height: 8),
-                    Text(_result,
-                        style: const TextStyle(
-                            fontFamily: 'monospace', fontSize: 16, height: 1.5),
-                        textAlign: TextAlign.center),
-                  ],
-                ),
-              ),
-            ).animate().fadeIn(),
             const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(_steps,
-                    style: const TextStyle(height: 1.4, fontSize: 13)),
+                padding: const EdgeInsets.all(12),
+                child: SelectableText(
+                  _result,
+                  style: const TextStyle(
+                      fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                ),
               ),
-            ).animate().fadeIn(delay: 80.ms),
+            ),
+            Text(_steps, style: const TextStyle(fontSize: 12)),
           ],
         ],
       ),
     );
   }
 }
+
+// local min helper
+int math_min(int a, int b) => a < b ? a : b;

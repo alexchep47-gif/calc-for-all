@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../data/services/graph_service.dart';
 import '../../data/services/function_analysis_service.dart';
 import '../../data/services/math_expression_engine.dart';
+import '../../data/services/math_library.dart';
 
 class GraphScreen extends StatefulWidget {
   const GraphScreen({super.key});
@@ -112,7 +113,7 @@ class _GraphScreenState extends State<GraphScreen>
       _loading = true;
       _error = '';
     });
-    await Future.delayed(const Duration(milliseconds: 60));
+    await Future.delayed(const Duration(milliseconds: 40));
     final expr = _funcController.text.trim();
     if (expr.isEmpty) {
       setState(() {
@@ -128,8 +129,9 @@ class _GraphScreenState extends State<GraphScreen>
         _xMax = suggested.xMax;
       }
       final segments =
-          _graphService.evaluateSegments(expr, _xMin, _xMax, 800);
-      // Y auto pour repere orthonorme raisonnable
+          _graphService.evaluateSegments(expr, _xMin, _xMax, 900);
+
+      // Y depuis les points, puis ecretage asymptotes
       var ymin = double.infinity;
       var ymax = -double.infinity;
       for (final seg in segments) {
@@ -142,40 +144,38 @@ class _GraphScreenState extends State<GraphScreen>
         ymin = -5;
         ymax = 5;
       }
-      // Marge + ecretage extremes asymptotes
       if (ymax - ymin < 1e-6) {
         ymin -= 1;
         ymax += 1;
       }
-      final yPad = (ymax - ymin) * 0.15;
+      final yPad = (ymax - ymin) * 0.12;
       ymin -= yPad;
       ymax += yPad;
-      // Limiter l'echelle Y si asymptote verticale
-      if (ymax - ymin > 40) {
+      if (ymax - ymin > 30) {
         final mid = (ymin + ymax) / 2;
-        ymin = mid - 20;
-        ymax = mid + 20;
+        ymin = mid - 15;
+        ymax = mid + 15;
       }
-      // Orthonorme : meme amplitude en X et Y (centimetres / unites)
+
+      // Orthonorme : meme span X et Y (1 carreau = 1 unite = 1 cm)
       final xSpan = _xMax - _xMin;
       final ySpan = ymax - ymin;
       final span = math.max(xSpan, ySpan);
       final xMid = (_xMin + _xMax) / 2;
       final yMid = (ymin + ymax) / 2;
-      // On garde le domaine X calcule, on etend Y pour orthonorme visuel
-      // si possible — sinon on force span commun autour du centre
-      if (span > 0) {
-        _yMin = yMid - span / 2;
-        _yMax = yMid + span / 2;
-        // Si domaine X est le vrai domaine, on n'elargit pas X force
-      } else {
-        _yMin = ymin;
-        _yMax = ymax;
-      }
+      _xMin = xMid - span / 2;
+      _xMax = xMid + span / 2;
+      _yMin = yMid - span / 2;
+      _yMax = yMid + span / 2;
 
-      final study = _analysisService.analyze(expr, xMin: _xMin, xMax: _xMax);
+      // Recalcul points sur le domaine orthonorme
+      final segs2 =
+          _graphService.evaluateSegments(expr, _xMin, _xMax, 1000);
+      final study =
+          _analysisService.analyze(expr, xMin: _xMin, xMax: _xMax);
+
       setState(() {
-        _segments = segments;
+        _segments = segs2;
         _study = study;
         _loading = false;
         if (_segments.isEmpty) {
@@ -334,53 +334,60 @@ class _GraphScreenState extends State<GraphScreen>
                     }
                   }),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  _fractionMode ? 'Numerateur / Denominateur' : 'Expression',
-                  style:
-                      TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
               ],
             ),
           ),
           if (_fractionMode)
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
+              padding: const EdgeInsets.fromLTRB(32, 10, 32, 4),
               child: Column(
                 children: [
-                  // Fraction style : num
-                  //                 ———
-                  //                 den
-                  TextField(
-                    controller: _numController,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w600),
-                    decoration: const InputDecoration(
-                      hintText: 'numerateur',
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                    onChanged: (_) => _applyFraction(),
-                    onSubmitted: (_) => _analyze(),
-                  ),
+                  // Style fraction centree
                   Container(
-                    height: 2.5,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: primary,
-                  ),
-                  TextField(
-                    controller: _denController,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w600),
-                    decoration: const InputDecoration(
-                      hintText: 'denominateur',
-                      border: InputBorder.none,
-                      isDense: true,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: primary.withOpacity(0.35), width: 1.2),
                     ),
-                    onChanged: (_) => _applyFraction(),
-                    onSubmitted: (_) => _analyze(),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _numController,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 22, fontWeight: FontWeight.w600),
+                          decoration: const InputDecoration(
+                            hintText: 'numerateur',
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(_applyFraction),
+                          onSubmitted: (_) => _analyze(),
+                        ),
+                        Container(
+                          height: 2.5,
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          color: primary,
+                        ),
+                        TextField(
+                          controller: _denController,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 22, fontWeight: FontWeight.w600),
+                          decoration: const InputDecoration(
+                            hintText: 'denominateur',
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(_applyFraction),
+                          onSubmitted: (_) => _analyze(),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -435,7 +442,7 @@ class _GraphScreenState extends State<GraphScreen>
             ),
           if (_fractionMode)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: FilledButton(
                 onPressed: _loading ? null : _analyze,
                 style: FilledButton.styleFrom(
@@ -455,6 +462,10 @@ class _GraphScreenState extends State<GraphScreen>
                     _autoDomain = false;
                     _xMin -= 3;
                     _xMax += 3;
+                    final midY = (_yMin + _yMax) / 2;
+                    final half = (_xMax - _xMin) / 2;
+                    _yMin = midY - half;
+                    _yMax = midY + half;
                   });
                   _analyze();
                 }),
@@ -464,6 +475,8 @@ class _GraphScreenState extends State<GraphScreen>
                     _autoDomain = true;
                     _xMin = -10;
                     _xMax = 10;
+                    _yMin = -10;
+                    _yMax = 10;
                   });
                   _analyze();
                 }),
@@ -475,6 +488,9 @@ class _GraphScreenState extends State<GraphScreen>
                     final half = (_xMax - _xMin) / 4;
                     _xMin = mid - half;
                     _xMax = mid + half;
+                    final midY = (_yMin + _yMax) / 2;
+                    _yMin = midY - half;
+                    _yMax = midY + half;
                   });
                   _analyze();
                 }),
@@ -622,8 +638,8 @@ class _GraphScreenState extends State<GraphScreen>
   }
 }
 
-/// Repere orthonorme : grillage type papier millimetre (1 u = 1 cm),
-/// axes gradues, courbe en segments (pas de liaison aux asymptotes).
+/// Repere orthonorme type papier millimetre / Desmos :
+/// meme echelle X/Y, grille fine + principale, axes gradues.
 class _OrthonormalPainter extends CustomPainter {
   final List<List<MapEntry<double, double>>> segments;
   final double xMin, xMax, yMin, yMax;
@@ -640,15 +656,16 @@ class _OrthonormalPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final padL = 36.0, padR = 12.0, padT = 12.0, padB = 28.0;
+    const padL = 40.0, padR = 14.0, padT = 14.0, padB = 30.0;
     final w = size.width - padL - padR;
     final h = size.height - padT - padB;
     if (w <= 0 || h <= 0) return;
 
-    // Echelle orthonorme : meme pixels par unite en X et Y
     final xSpan = (xMax - xMin).abs();
     final ySpan = (yMax - yMin).abs();
     if (xSpan < 1e-12 || ySpan < 1e-12) return;
+
+    // Orthonorme : meme pixels / unite
     final scale = math.min(w / xSpan, h / ySpan);
     final usedW = xSpan * scale;
     final usedH = ySpan * scale;
@@ -658,43 +675,47 @@ class _OrthonormalPainter extends CustomPainter {
     double toPx(double x) => ox + (x - xMin) * scale;
     double toPy(double y) => oy + usedH - (y - yMin) * scale;
 
-    // Fond
-    final bg = Paint()..color = const Color(0xFF0E1520);
+    // Fond style Desmos dark
+    final bg = Paint()..color = const Color(0xFF0B1220);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-          Rect.fromLTWH(0, 0, size.width, size.height), const Radius.circular(12)),
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        const Radius.circular(12),
+      ),
       bg,
     );
 
-    // Grille fine (0.2) + grosse (1) style cm
-    final gridFine = Paint()
+    final gridMinor = Paint()
       ..color = const Color(0xFF1A2740)
-      ..strokeWidth = 0.5;
+      ..strokeWidth = 0.6;
     final gridMajor = Paint()
-      ..color = const Color(0xFF2A3A55)
-      ..strokeWidth = 1;
+      ..color = const Color(0xFF2C3E5A)
+      ..strokeWidth = 1.1;
     final axisPaint = Paint()
-      ..color = const Color(0xFF8FA3BF)
-      ..strokeWidth = 1.5;
+      ..color = const Color(0xFFB8C5D6)
+      ..strokeWidth = 1.6;
 
+    // Pas type "cm" : 1 unite principale, 0.2 secondaire
     final stepMajor = _niceStep(math.min(xSpan, ySpan) / 8);
-    final stepFine = stepMajor / 5;
+    final stepMinor = stepMajor / 5;
 
-    // Verticales
-    for (var x = _floorTo(xMin, stepFine); x <= xMax + 1e-9; x += stepFine) {
+    for (var x = _floorTo(xMin, stepMinor); x <= xMax + 1e-9; x += stepMinor) {
       final px = toPx(x);
       if (px < ox - 1 || px > ox + usedW + 1) continue;
-      final major = _isMultiple(x, stepMajor);
       canvas.drawLine(
-          Offset(px, oy), Offset(px, oy + usedH), major ? gridMajor : gridFine);
+        Offset(px, oy),
+        Offset(px, oy + usedH),
+        _isMultiple(x, stepMajor) ? gridMajor : gridMinor,
+      );
     }
-    // Horizontales
-    for (var y = _floorTo(yMin, stepFine); y <= yMax + 1e-9; y += stepFine) {
+    for (var y = _floorTo(yMin, stepMinor); y <= yMax + 1e-9; y += stepMinor) {
       final py = toPy(y);
       if (py < oy - 1 || py > oy + usedH + 1) continue;
-      final major = _isMultiple(y, stepMajor);
       canvas.drawLine(
-          Offset(ox, py), Offset(ox + usedW, py), major ? gridMajor : gridFine);
+        Offset(ox, py),
+        Offset(ox + usedW, py),
+        _isMultiple(y, stepMajor) ? gridMajor : gridMinor,
+      );
     }
 
     // Axes
@@ -707,7 +728,7 @@ class _OrthonormalPainter extends CustomPainter {
       canvas.drawLine(Offset(ox, py), Offset(ox + usedW, py), axisPaint);
     }
 
-    // Graduations + labels
+    // Labels
     final tp = TextPainter(textDirection: TextDirection.ltr);
     for (var x = _floorTo(xMin, stepMajor); x <= xMax + 1e-9; x += stepMajor) {
       if (x.abs() < stepMajor * 0.01) continue;
@@ -730,7 +751,7 @@ class _OrthonormalPainter extends CustomPainter {
       tp.paint(canvas, Offset(ox - tp.width - 6, py - tp.height / 2));
     }
 
-    // Courbe par segments
+    // Courbes par segments
     final curve = Paint()
       ..color = curveColor
       ..strokeWidth = 2.4
@@ -748,7 +769,6 @@ class _OrthonormalPainter extends CustomPainter {
       canvas.drawPath(path, curve);
     }
 
-    // Cadre
     final border = Paint()
       ..color = const Color(0xFF3A4A66)
       ..style = PaintingStyle.stroke
@@ -792,5 +812,6 @@ class _OrthonormalPainter extends CustomPainter {
       old.xMin != xMin ||
       old.xMax != xMax ||
       old.yMin != yMin ||
-      old.yMax != yMax;
+      old.yMax != yMax ||
+      old.curveColor != curveColor;
 }

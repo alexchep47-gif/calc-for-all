@@ -56,7 +56,6 @@ jobs:
           echo "Building version from pubspec:"
           grep '^version:' pubspec.yaml
           flutter build web --release --base-href "/app/"
-          # Cache-bust: inject build id into index for hard refresh
           BUILD_ID="${{ github.sha }}"
           echo "$BUILD_ID" > build/web/.last_build_id
           if [ -f build/web/index.html ]; then
@@ -88,11 +87,37 @@ jobs:
           cp -a build/web/. /tmp/cfa-web/app/
           echo "${{ github.sha }}" > /tmp/cfa-web/app/.last_build_id
           echo "${{ github.sha }}" > /tmp/cfa-web/.calc-for-all-source-sha
-          # Force change so Vercel always redeploys
           date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/cfa-web/app/.deployed_at
+          # Keep vercel routing healthy (do not rewrite static assets)
+          cat > /tmp/cfa-web/vercel.json << 'EOF'
+          {
+            "cleanUrls": false,
+            "trailingSlash": true,
+            "rewrites": [
+              { "source": "/", "destination": "/app/index.html" },
+              { "source": "/app", "destination": "/app/index.html" },
+              { "source": "/app/", "destination": "/app/index.html" }
+            ],
+            "headers": [
+              {
+                "source": "/(.*)",
+                "headers": [
+                  { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+                ]
+              }
+            ]
+          }
+          EOF
+          cat > /tmp/cfa-web/index.html << 'EOF'
+          <!DOCTYPE html><html><head>
+          <meta http-equiv="refresh" content="0; url=/app/" />
+          <script>location.replace('/app/');</script>
+          </head><body><a href="/app/">Calc For All</a></body></html>
+          EOF
           cd /tmp/cfa-web
           git add -A
           git status
-          git commit -m "Deploy Calc For All 3.1.0 ${{ github.sha }}" || echo "Nothing to commit"
+          VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}')
+          git commit -m "Deploy Calc For All ${VER} ${{ github.sha }}" || echo "Nothing to commit"
           git push origin main
-          echo "Deployed 3.1.0 to calc-for-all-web/app — Vercel will pick up"
+          echo "Deployed ${VER} to calc-for-all-web/app — Vercel auto-deploy"

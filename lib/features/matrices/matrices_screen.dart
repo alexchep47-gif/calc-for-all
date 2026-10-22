@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../data/services/math_library.dart';
 
@@ -13,7 +15,7 @@ class _MatricesScreenState extends State<MatricesScreen> {
   int _rows = 2;
   int _cols = 2;
   int _matrixCount = 2;
-  late List<List<List<TextEditingController>>> _matrices; // [mat][row][col]
+  late List<List<List<TextEditingController>>> _matrices;
   String _operation = 'addition';
   String _result = '';
   String _steps = '';
@@ -160,19 +162,21 @@ class _MatricesScreenState extends State<MatricesScreen> {
   }
 
   void _calculate() {
-    final mats =
-        List.generate(_matrixCount, (i) => _read(i));
+    final mats = List.generate(_matrixCount, (i) => _read(i));
     final buffer = StringBuffer();
 
     try {
       if (_operation == 'addition' || _operation == 'soustraction') {
         final isAdd = _operation == 'addition';
-        buffer.writeln(isAdd ? 'Somme de $_matrixCount matrices' : 'Différences successives');
+        buffer.writeln(isAdd
+            ? 'Somme de $_matrixCount matrices'
+            : 'Différences successives');
         var R = mats.first.map((r) => List<double>.from(r)).toList();
         for (var k = 1; k < mats.length; k++) {
           for (var i = 0; i < _rows; i++) {
             for (var j = 0; j < _cols; j++) {
-              R[i][j] = isAdd ? R[i][j] + mats[k][i][j] : R[i][j] - mats[k][i][j];
+              R[i][j] =
+                  isAdd ? R[i][j] + mats[k][i][j] : R[i][j] - mats[k][i][j];
             }
           }
         }
@@ -182,7 +186,6 @@ class _MatricesScreenState extends State<MatricesScreen> {
           _steps = buffer.toString();
         });
       } else if (_operation == 'multiplication') {
-        // Produit successif A1*A2*... (nécessite cols_k = rows_{k+1})
         var R = mats.first.map((r) => List<double>.from(r)).toList();
         for (var k = 1; k < mats.length; k++) {
           final A = R;
@@ -212,8 +215,7 @@ class _MatricesScreenState extends State<MatricesScreen> {
       } else if (_operation == 'trace') {
         final lines = <String>[];
         for (var i = 0; i < mats.length; i++) {
-          final t = _trace(mats[i]);
-          lines.add('Tr(A${i + 1}) = ${_fmt(t)}');
+          lines.add('Tr(A${i + 1}) = ${_fmt(_trace(mats[i]))}');
         }
         setState(() {
           _result = lines.join('\n');
@@ -398,6 +400,3 @@ class _MatricesScreenState extends State<MatricesScreen> {
     );
   }
 }
-
-// local min helper
-int math_min(int a, int b) => a < b ? a : b;

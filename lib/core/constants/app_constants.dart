@@ -1,7 +1,7 @@
 /// Constantes de l'application
 class AppConstants {
   static const String appName = 'Calc For All';
-  static const String appVersion = '3.4.0';
+  static const String appVersion = '3.4.1';
   static const String appDescription =
       'Calculatrice scientifique avancée avec graphiques, nombres complexes et étude de fonction.';
 
@@ -13,5 +13,5 @@ class AppConstants {
   static const String keyFontScale = 'font_scale';
   static const String keyLocale = 'app_locale';
 
-  static const int maxHistoryItems = 50;
+  static const int maxHistoryItems = 100;
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Bibliotheque complete de formules mathematiques (hors ligne)
+/// Bibliothèque de formules mathématiques (hors ligne) — enrichie
 class MathLibraryScreen extends StatefulWidget {
   const MathLibraryScreen({super.key});
 
@@ -15,105 +15,121 @@ class _MathLibraryScreenState extends State<MathLibraryScreen> {
 
   static const categories = [
     'Tous',
-    'Algebre',
+    'Algèbre',
     'Analyse',
-    'Trigonometrie',
-    'Geometrie',
-    'Probabilites',
+    'Trigonométrie',
+    'Géométrie',
+    'Probabilités',
     'Suites',
     'Complexes',
     'Matrices',
+    'Statistiques',
   ];
 
   static final formulas = <_Formula>[
-    _Formula('Algebre', 'Identites remarquables',
-        '(a+b)^2 = a^2 + 2ab + b^2\n(a-b)^2 = a^2 - 2ab + b^2\na^2 - b^2 = (a-b)(a+b)'),
-    _Formula('Algebre', 'Equation du second degre',
-        'ax^2 + bx + c = 0\nDelta = b^2 - 4ac\nx = (-b +/- sqrt(Delta)) / (2a)'),
-    _Formula('Algebre', 'Somme et produit des racines',
-        'Si x1, x2 racines de ax^2+bx+c=0\nx1+x2 = -b/a\nx1*x2 = c/a'),
-    _Formula('Algebre', 'Factorielle / binome',
-        'n! = 1*2*...*n\nC(n,k) = n! / (k!(n-k)!)\n(a+b)^n = somme C(n,k) a^(n-k) b^k'),
-    _Formula('Analyse', 'Derivees usuelles',
-        "(x^n)' = n x^(n-1)\n(ln x)' = 1/x\n(e^x)' = e^x\n(sin x)' = cos x\n(cos x)' = -sin x\n(tan x)' = 1/cos^2(x)"),
-    _Formula('Analyse', 'Regles de derivation',
-        "(u+v)' = u'+v'\n(uv)' = u'v + uv'\n(u/v)' = (u'v - uv')/v^2\n(u o v)' = (u' o v) * v'"),
-    _Formula('Analyse', 'Integrales usuelles',
-        'int x^n dx = x^(n+1)/(n+1) + C (n != -1)\nint 1/x dx = ln|x| + C\nint e^x dx = e^x + C\nint sin x dx = -cos x + C\nint cos x dx = sin x + C'),
+    // —— Algèbre ——
+    _Formula('Algèbre', 'Identités remarquables',
+        '(a+b)² = a² + 2ab + b²\n(a−b)² = a² − 2ab + b²\na² − b² = (a−b)(a+b)\n(a+b)³ = a³ + 3a²b + 3ab² + b³'),
+    _Formula('Algèbre', 'Équation du second degré',
+        'ax² + bx + c = 0\nΔ = b² − 4ac\nSi Δ > 0 : x = (−b ± √Δ)/(2a)\nSi Δ = 0 : x = −b/(2a)\nSi Δ < 0 : racines complexes'),
+    _Formula('Algèbre', 'Binôme de Newton',
+        '(a+b)^n = Σ C(n,k) a^(n−k) b^k\nC(n,k) = n! / (k!(n−k)!)'),
+    _Formula('Algèbre', 'Factorisation',
+        'a³ − b³ = (a−b)(a² + ab + b²)\na³ + b³ = (a+b)(a² − ab + b²)'),
+    // —— Analyse ——
+    _Formula('Analyse', 'Dérivées usuelles',
+        '(x^n)\' = n x^(n−1)\n(√x)\' = 1/(2√x)\n(e^x)\' = e^x\n(ln x)\' = 1/x\n(sin x)\' = cos x\n(cos x)\' = −sin x\n(tan x)\' = 1 + tan²x = 1/cos²x'),
+    _Formula('Analyse', 'Primitives usuelles',
+        '∫ x^n dx = x^(n+1)/(n+1) + C (n ≠ −1)\n∫ 1/x dx = ln|x| + C\n∫ e^x dx = e^x + C\n∫ sin x dx = −cos x + C\n∫ cos x dx = sin x + C'),
     _Formula('Analyse', 'Limites classiques',
-        'lim x->0 sin(x)/x = 1\nlim x->0 (1-cos x)/x^2 = 1/2\nlim x->inf (1+1/x)^x = e\nlim x->0 ln(1+x)/x = 1'),
-    _Formula('Analyse', 'Asymptotes',
-        'Verticale x=a si lim x->a f = +/-inf\nHorizontale y=L si lim x->+/-inf f = L\nOblique y=ax+b si lim (f-ax-b)=0'),
-    _Formula('Trigonometrie', 'Valeurs remarquables',
-        'sin(0)=0  cos(0)=1\nsin(pi/6)=1/2  cos(pi/6)=sqrt(3)/2\nsin(pi/4)=sqrt(2)/2  cos(pi/4)=sqrt(2)/2\nsin(pi/3)=sqrt(3)/2  cos(pi/3)=1/2\nsin(pi/2)=1  cos(pi/2)=0'),
-    _Formula('Trigonometrie', 'Formules d addition',
-        'cos(a+/-b) = cos a cos b -/+ sin a sin b\nsin(a+/-b) = sin a cos b +/- cos a sin b\ntan(a+/-b) = (tan a +/- tan b)/(1 -/+ tan a tan b)'),
-    _Formula('Trigonometrie', 'Duplication',
-        'cos 2a = cos^2 a - sin^2 a = 2cos^2 a - 1\nsin 2a = 2 sin a cos a\ntan 2a = 2 tan a / (1 - tan^2 a)'),
-    _Formula('Trigonometrie', 'Pythagore trigonometrique',
-        'cos^2 + sin^2 = 1\n1 + tan^2 = 1/cos^2\n1 + cot^2 = 1/sin^2'),
-    _Formula('Geometrie', 'Pythagore / Thales',
-        'Triangle rectangle : a^2 + b^2 = c^2\nThales : AD/AB = AE/AC = DE/BC'),
-    _Formula('Geometrie', 'Aires',
-        'Rectangle : L*l\nTriangle : (b*h)/2\nCercle : pi r^2'),
-    _Formula('Geometrie', 'Volumes',
-        'Cube : a^3\nSphere : (4/3) pi r^3\nCylindre : pi r^2 h\nCone : (1/3) pi r^2 h'),
-    _Formula('Geometrie', 'Vecteurs',
-        'u.v = |u||v| cos theta = ux*vx + uy*vy + uz*vz\n|u x v| = |u||v| sin theta'),
-    _Formula('Probabilites', 'Denombrement',
-        'Permutations : n!\nArrangements A(n,k) = n!/(n-k)!\nCombinaisons C(n,k) = n!/(k!(n-k)!)'),
-    _Formula('Probabilites', 'Loi binomiale',
-        'X ~ B(n,p)\nP(X=k) = C(n,k) p^k (1-p)^(n-k)\nE(X)=np  V(X)=np(1-p)'),
-    _Formula('Probabilites', 'Loi normale',
-        'X ~ N(mu, sigma^2)\nz = (x-mu)/sigma\nf(x) = 1/(sigma sqrt(2pi)) exp(-1/2 z^2)'),
-    _Formula('Suites', 'Arithmetique',
-        'u_n = u_0 + n r\nS_n = (n+1)(u_0+u_n)/2'),
-    _Formula('Suites', 'Geometrique',
-        'u_n = u_0 * q^n\nS_n = u_0 (1-q^(n+1))/(1-q)  (q != 1)'),
+        'lim(x→0) sin(x)/x = 1\nlim(x→0) (1−cos x)/x² = 1/2\nlim(x→∞) (1+1/x)^x = e\nlim(x→0) ln(1+x)/x = 1'),
+    _Formula('Analyse', 'Règles de dérivation',
+        '(u+v)\' = u\' + v\'\n(uv)\' = u\'v + uv\'\n(u/v)\' = (u\'v − uv\')/v²\n(u∘v)\' = (u\'∘v)·v\''),
+    // —— Trigonométrie ——
+    _Formula('Trigonométrie', 'Identités fondamentales',
+        'cos²θ + sin²θ = 1\n1 + tan²θ = 1/cos²θ\nsin(2θ) = 2 sinθ cosθ\ncos(2θ) = cos²θ − sin²θ = 2cos²θ − 1'),
+    _Formula('Trigonométrie', 'Valeurs remarquables',
+        'sin(0)=0, sin(π/6)=1/2, sin(π/4)=√2/2, sin(π/3)=√3/2, sin(π/2)=1\ncos(0)=1, cos(π/6)=√3/2, cos(π/4)=√2/2, cos(π/3)=1/2, cos(π/2)=0'),
+    _Formula('Trigonométrie', 'Formules d\'addition',
+        'sin(a±b) = sin a cos b ± cos a sin b\ncos(a±b) = cos a cos b ∓ sin a sin b\ntan(a±b) = (tan a ± tan b)/(1 ∓ tan a tan b)'),
+    _Formula('Trigonométrie', 'Équations trigonométriques',
+        'sin x = sin α  ⇒  x = α + 2kπ ou x = π − α + 2kπ\ncos x = cos α  ⇒  x = ±α + 2kπ\ntan x = tan α  ⇒  x = α + kπ'),
+    // —— Géométrie ——
+    _Formula('Géométrie', 'Aires et volumes',
+        'Disque : πr²\nCercle (périmètre) : 2πr\nSphère (volume) : (4/3)πr³\nSphère (aire) : 4πr²\nCône : (1/3)πr²h\nCylindre : πr²h'),
+    _Formula('Géométrie', 'Théorème de Pythagore',
+        'Dans un triangle rectangle : a² + b² = c²\nc hypoténuse'),
+    _Formula('Géométrie', 'Théorème de Thalès',
+        'Si (DE) ∥ (BC) dans ABC avec D sur (AB), E sur (AC) :\nAD/AB = AE/AC = DE/BC'),
+    _Formula('Géométrie', 'Produit scalaire',
+        'u·v = ||u|| ||v|| cos θ\nu·v = x1x2 + y1y2 (+ z1z2)\nOrthogonalité : u·v = 0'),
+    // —— Probabilités ——
+    _Formula('Probabilités', 'Dénombrement',
+        'Permutations : n!\nArrangements : A(n,k) = n!/(n−k)!\nCombinaisons : C(n,k) = n!/(k!(n−k)!)'),
+    _Formula('Probabilités', 'Loi binomiale',
+        'X ~ B(n,p)\nP(X=k) = C(n,k) p^k (1−p)^(n−k)\nE(X)=np, V(X)=np(1−p)'),
+    _Formula('Probabilités', 'Loi normale',
+        'X ~ N(μ,σ²)\nDensité : (1/(σ√(2π))) exp(−(x−μ)²/(2σ²))\nZ = (X−μ)/σ ~ N(0,1)'),
+    // —— Suites ——
+    _Formula('Suites', 'Suite arithmétique',
+        'un = u1 + (n−1)r\nSn = n(u1+un)/2 = n(2u1+(n−1)r)/2'),
+    _Formula('Suites', 'Suite géométrique',
+        'un = u1 · q^(n−1)\nSn = u1(1−q^n)/(1−q) si q≠1\nSi |q|<1 : lim Sn = u1/(1−q)'),
+    _Formula('Suites', 'Suite récurrente linéaire',
+        'u(n+1) = a·un + b\nPoint fixe L = b/(1−a) si a≠1\nConvergence si |a|<1'),
+    _Formula('Suites', 'Fibonacci',
+        'F1=1, F2=1, Fn = F(n−1)+F(n−2)\nFormule de Binet : Fn ≈ φ^n / √5\nφ = (1+√5)/2'),
+    // —— Complexes ——
     _Formula('Complexes', 'Formes',
-        'z = a + bi = r (cos theta + i sin theta) = r e^(i theta)\nr = |z| = sqrt(a^2+b^2)'),
-    _Formula('Complexes', 'Operations',
-        '(a+bi)(c+di) = (ac-bd)+(ad+bc)i\n1/z = conjugate(z) / |z|^2'),
-    _Formula('Matrices', '2x2',
-        'det [[a,b],[c,d]] = ad-bc\nInverse = (1/det) [[d,-b],[-c,a]]'),
-    _Formula('Matrices', 'Proprietes',
-        'det(AB)=det(A)det(B)\n(AB)^-1 = B^-1 A^-1'),
+        'Algébrique : z = a + bi\nModule : |z| = √(a²+b²)\nArgument : arg(z) = atan2(b,a)\nPolaire : z = |z|(cos θ + i sin θ)\nExponentielle : z = |z| e^(iθ)'),
+    _Formula('Complexes', 'Opérations',
+        '(a+bi)+(c+di) = (a+c)+(b+d)i\n(a+bi)(c+di) = (ac−bd)+(ad+bc)i\nConjugué : z̄ = a − bi\nz·z̄ = |z|²'),
+    // —— Matrices ——
+    _Formula('Matrices', 'Déterminant 2×2',
+        '|a b|\n|c d| = ad − bc'),
+    _Formula('Matrices', 'Inverse 2×2',
+        'A⁻¹ = (1/det A) · | d −b |\n                    |−c  a |'),
+    _Formula('Matrices', 'Trace et transposée',
+        'Tr(A) = somme des aᵢᵢ\n(Aᵀ)ᵢⱼ = Aⱼᵢ\nTr(A+B)=Tr(A)+Tr(B)\nTr(AB)=Tr(BA)'),
+    // —— Statistiques ——
+    _Formula('Statistiques', 'Indicateurs',
+        'Moyenne : x̄ = (Σ xi)/n\nVariance : V = (Σ (xi−x̄)²)/n\nÉcart-type : σ = √V\nMédiane : valeur centrale triée'),
+    _Formula('Statistiques', 'Quartiles',
+        'Q1 : 25e centile\nQ2 = médiane\nQ3 : 75e centile\nÉcart interquartile : Q3 − Q1'),
   ];
 
   @override
   Widget build(BuildContext context) {
     final filtered = formulas.where((f) {
-      final catOk = _category == 'Tous' || f.category == _category;
-      final q = _query.trim().toLowerCase();
-      final qOk = q.isEmpty ||
+      final okCat = _category == 'Tous' || f.category == _category;
+      final q = _query.toLowerCase();
+      final okQ = q.isEmpty ||
           f.title.toLowerCase().contains(q) ||
           f.body.toLowerCase().contains(q) ||
           f.category.toLowerCase().contains(q);
-      return catOk && qOk;
+      return okCat && okQ;
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Bibliotheque mathematiques')),
+      appBar: AppBar(title: const Text('Bibliothèque mathématiques')),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.all(12),
             child: TextField(
-              onChanged: (v) => setState(() => _query = v),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
                 hintText: 'Rechercher une formule…',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                border: OutlineInputBorder(),
               ),
+              onChanged: (v) => setState(() => _query = v),
             ),
           ),
           SizedBox(
             height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               children: categories
                   .map((c) => Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -159,7 +175,7 @@ class _MathLibraryScreenState extends State<MathLibraryScreen> {
                             Clipboard.setData(ClipboardData(text: f.body));
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                  content: Text('Formule copiee')),
+                                  content: Text('Formule copiée')),
                             );
                           },
                           icon: const Icon(Icons.copy, size: 18),

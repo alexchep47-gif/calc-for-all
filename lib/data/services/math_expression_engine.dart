@@ -4,7 +4,6 @@ import 'math_library.dart';
 
 /// Moteur hors-ligne : parse, evalue, derive — s'appuie sur [MathLibrary].
 class MathExpressionEngine {
-  /// Nettoie l'entree via la bibliotheque maths
   String normalize(String input) => MathLibrary.normalizeExpression(input);
 
   double? evaluate(String input, [double x = 0]) {
@@ -13,7 +12,7 @@ class MathExpressionEngine {
       final root = _Parser(_tokenize(normalized)).parse();
       final value = root.evaluate(x);
       if (value.isNaN) return null;
-      if (!value.isFinite) return value; // +/-inf utile parfois
+      if (!value.isFinite) return value;
       return MathLibrary.clean(value);
     } catch (_) {
       return null;
@@ -30,6 +29,7 @@ class MathExpressionEngine {
     }
   }
 
+  /// Domaine de trace raisonnable (log, sqrt, denoms, constantes e/pi).
   ({double xMin, double xMax}) suggestDomain(
     String input, {
     double fallbackMin = -10,
@@ -37,6 +37,19 @@ class MathExpressionEngine {
   }) {
     final expr = normalize(input);
 
+    // log(x - c) ou log(x + c) avec c numerique ou e/pi
+    final logXc = RegExp(
+      r'log\(\s*x\s*([+-])\s*(e|pi|\d*\.?\d+)\s*\)',
+    ).firstMatch(expr);
+    if (logXc != null) {
+      final sign = logXc.group(1) == '-' ? -1.0 : 1.0;
+      final c = _constValue(logXc.group(2)!);
+      final bound = -sign * c; // x + sign*c > 0 => x > -sign*c
+      // Pour log(x-e): sign=-1, c=e => bound = e
+      return (xMin: bound + 0.05, xMax: bound + 12);
+    }
+
+    // log(ax+b)
     final logMatch = RegExp(
       r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
     ).firstMatch(expr);
@@ -72,7 +85,39 @@ class MathExpressionEngine {
       }
     }
 
+    // Scan numerique : trouver le premier intervalle ou f est definie
+    final scan = _scanDomain(expr, -20, 20);
+    if (scan != null) return scan;
+
     return (xMin: fallbackMin, xMax: fallbackMax);
+  }
+
+  ({double xMin, double xMax})? _scanDomain(
+    String expr,
+    double a,
+    double b,
+  ) {
+    final n = 400;
+    final step = (b - a) / n;
+    double? first;
+    double? last;
+    for (var i = 0; i <= n; i++) {
+      final x = a + i * step;
+      final y = evaluate(expr, x);
+      if (y != null && y.isFinite && y.abs() < 1e5) {
+        first ??= x;
+        last = x;
+      }
+    }
+    if (first == null || last == null || last - first < 0.5) return null;
+    final margin = (last - first) * 0.05;
+    return (xMin: first - margin, xMax: last + margin);
+  }
+
+  double _constValue(String s) {
+    if (s == 'e') return MathLibrary.e;
+    if (s == 'pi') return MathLibrary.pi;
+    return double.tryParse(s) ?? 0;
   }
 
   double _coeff(String? value) {

@@ -33,9 +33,31 @@ class MathLibrary {
       x.abs() <= 1 ? math.acos(x) : double.nan;
   static double atan(double x) => math.atan(x);
   static double atan2(double y, double x) => math.atan2(y, x);
-  static double sinh(double x) => math.sinh(x);
-  static double cosh(double x) => math.cosh(x);
-  static double tanh(double x) => math.tanh(x);
+
+  /// Hyperboliques (implementes a la main : absents de dart:math sur SDK 3.x)
+  static double sinh(double x) {
+    if (x.abs() < 1e-8) return x;
+    if (x > 20) return math.exp(x) / 2;
+    if (x < -20) return -math.exp(-x) / 2;
+    final e1 = math.exp(x);
+    final e2 = math.exp(-x);
+    return (e1 - e2) / 2;
+  }
+
+  static double cosh(double x) {
+    if (x.abs() > 20) return math.exp(x.abs()) / 2;
+    final e1 = math.exp(x);
+    final e2 = math.exp(-x);
+    return (e1 + e2) / 2;
+  }
+
+  static double tanh(double x) {
+    if (x > 20) return 1;
+    if (x < -20) return -1;
+    final e2 = math.exp(2 * x);
+    return (e2 - 1) / (e2 + 1);
+  }
+
   static double sqrt(double x) => x >= 0 ? math.sqrt(x) : double.nan;
   static double cbrt(double x) => x >= 0
       ? math.pow(x, 1 / 3).toDouble()
@@ -132,7 +154,6 @@ class MathLibrary {
         .replaceAll('[', '(')
         .replaceAll(']', ')');
 
-    // Autocorrect FR
     s = s
         .replaceAll(RegExp(r'\bIn\b'), 'ln')
         .replaceAll(RegExp(r'\bIN\b'), 'ln')
@@ -140,29 +161,15 @@ class MathLibrary {
 
     s = s.toLowerCase();
 
-    // Factorielle postfixe : 5! → fact(5)
     s = s.replaceAllMapped(RegExp(r'(\d+(?:\.\d+)?)!'), (m) {
       return 'fact(${m.group(1)})';
     });
 
-    // Pourcentages : 50% → (50/100)
     s = s.replaceAllMapped(RegExp(r'(\d+(?:\.\d+)?)%'), (m) {
       return '(${m.group(1)}/100)';
     });
 
-    // Multiplication implicite : 2pi → 2*pi, 2(3) → 2*(3), cospi → cos(pi)
     s = _insertImplicitMultiplication(s);
-
-    // cospi → cos(pi) si oubli de parentheses apres fonction
-    for (final f in functionNames) {
-      s = s.replaceAllMapped(
-        RegExp('$f(?!\()([a-z]|\d|\.|pi|e)'),
-        (m) => '$f(${m.group(1)}',
-      );
-      // Fermer si on a ouvert artificiellement une seule valeur simple
-      // (gere par le parseur en pratique via tokens)
-    }
-
     return s;
   }
 
@@ -176,15 +183,8 @@ class MathLibrary {
           _startsValue(current) &&
           !(out.last == ')' && current == '(') &&
           !(functionNames.contains(out.last) && current == '(')) {
-        // 2pi, )sin, pi(  → *
-        if (!(functionNames.contains(out.last))) {
+        if (!functionNames.contains(out.last)) {
           out.add('*');
-        } else if (current != '(') {
-          // sin pi → sin( pi  sera reparse
-          out.add('(');
-          out.add(current);
-          // fermeture differee difficile ici ; on laisse * pour 2sin
-          continue;
         }
       }
       out.add(current);
@@ -243,17 +243,15 @@ class MathLibrary {
       token == 'tau' ||
       functionNames.contains(token);
 
-  /// Arrondi propre : cos(pi) → -1, sin(pi) → 0 (pas 1e-16)
+  /// Arrondi propre : cos(pi) → -1, sin(pi) → 0
   static double clean(double v) {
     if (v.isNaN || v.isInfinite) return v;
     if (v.abs() < epsilon) return 0;
-    // Proche d'un entier
     final r = v.roundToDouble();
     if ((v - r).abs() < 1e-10) return r;
     return v;
   }
 
-  /// Format affichage utilisateur
   static String format(double v) {
     if (v.isNaN) return 'Indefini';
     if (v.isInfinite) return v.isNegative ? '-∞' : '+∞';
@@ -261,7 +259,6 @@ class MathLibrary {
     if (c == c.roundToDouble() && c.abs() < 1e15) {
       return c.toInt().toString();
     }
-    // Fraction simple
     final frac = toSimpleFraction(c);
     if (frac != null) return frac;
     var s = c.toStringAsFixed(12);

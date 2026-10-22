@@ -1,9 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:math' as math;
+
 import '../../data/services/math_library.dart';
 
-/// Cercle trigonometrique — angles en fractions de pi
+/// Cercle trigonométrique — angle affiché au point rouge (fraction de π)
 class UnitCircleScreen extends StatefulWidget {
   const UnitCircleScreen({super.key});
 
@@ -12,22 +14,17 @@ class UnitCircleScreen extends StatefulWidget {
 }
 
 class _UnitCircleScreenState extends State<UnitCircleScreen> {
-  /// Angle en degres (0..360), pas de 15° pour coller aux fractions usuelles
   double _angleDeg = 45;
-  bool _useDegrees = false; // radians par defaut pour afficher les fractions
+  bool _useDegrees = false; // défaut radians (fractions de π)
 
   double get _angleRad => _angleDeg * math.pi / 180;
 
-  /// Convertit un angle (rad) en fraction de pi : k*pi/n
   String _radToPiFraction(double rad) {
-    // Normalise dans [0, 2pi)
     var r = rad % (2 * math.pi);
     if (r < 0) r += 2 * math.pi;
     if (r < 1e-9 || (2 * math.pi - r) < 1e-9) return '0';
 
-    // r = (num/den) * pi  =>  num/den = r/pi
-    final ratio = r / math.pi; // dans [0, 2)
-    // Cherche fraction p/q avec q <= 24
+    final ratio = r / math.pi;
     int bestP = 1, bestQ = 1;
     double bestErr = double.infinity;
     for (var q = 1; q <= 24; q++) {
@@ -40,14 +37,10 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
         bestQ = q;
       }
     }
-    if (bestErr > 0.02) {
-      return '${MathLibrary.format(ratio)} π';
-    }
-    // Simplifie bestP/bestQ
+    if (bestErr > 0.02) return '${MathLibrary.format(ratio)} π';
     final g = _gcd(bestP, bestQ);
     bestP ~/= g;
     bestQ ~/= g;
-
     if (bestP == 0) return '0';
     if (bestQ == 1) {
       if (bestP == 1) return 'π';
@@ -70,7 +63,6 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
   }
 
   String _exactTrig(String fn, double deg) {
-    // Valeurs remarquables
     final d = ((deg % 360) + 360) % 360;
     final table = <double, Map<String, String>>{
       0: {'cos': '1', 'sin': '0', 'tan': '0'},
@@ -103,22 +95,26 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
     final sinVal = math.sin(_angleRad);
     final tanVal =
         (cosVal.abs() < 1e-10) ? double.infinity : math.tan(_angleRad);
-
     final cosExact = _exactTrig('cos', _angleDeg);
     final sinExact = _exactTrig('sin', _angleDeg);
     final tanExact = _exactTrig('tan', _angleDeg);
+    final angleLabel =
+        _useDegrees ? '${_angleDeg.round()}°' : _radToPiFraction(_angleRad);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Cercle trigonometrique')),
+      appBar: AppBar(title: const Text('Cercle trigonométrique')),
       body: Column(
         children: [
           Expanded(
             flex: 3,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: CustomPaint(
-                painter: _UnitCirclePainter(angleRad: _angleRad),
-                child: Container(),
+                painter: _UnitCirclePainter(
+                  angleRad: _angleRad,
+                  angleLabel: angleLabel,
+                ),
+                child: const SizedBox.expand(),
               ),
             ),
           ),
@@ -129,9 +125,8 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
               children: [
                 Row(
                   children: [
-                    const Text('Unite : '),
                     ChoiceChip(
-                      label: const Text('Degres'),
+                      label: const Text('Degrés'),
                       selected: _useDegrees,
                       onSelected: (_) => setState(() => _useDegrees = true),
                     ),
@@ -143,57 +138,37 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
-                  _useDegrees
-                      ? 'Angle : ${_angleDeg.round()}°'
-                      : 'Angle : ${_radToPiFraction(_angleRad)}',
+                  'Angle au point rouge : $angleLabel',
                   style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      fontWeight: FontWeight.w700, fontSize: 16),
                 ),
                 if (!_useDegrees)
-                  Text(
-                    '(≈ ${MathLibrary.format(_angleRad)} rad)',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                  ),
+                  Text('(≈ ${MathLibrary.format(_angleRad)} rad)',
+                      style: TextStyle(color: Colors.grey.shade600)),
                 Slider(
                   value: _angleDeg,
                   min: 0,
                   max: 360,
-                  divisions: 24, // pas de 15°
-                  label: _useDegrees
-                      ? '${_angleDeg.round()}°'
-                      : _radToPiFraction(_angleRad),
+                  divisions: 24,
+                  label: angleLabel,
                   onChanged: (v) => setState(() => _angleDeg = v),
                 ),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: [
-                    for (final d in [
-                      0,
-                      30,
-                      45,
-                      60,
-                      90,
-                      120,
-                      150,
-                      180,
-                      270,
-                      360
-                    ])
-                      ActionChip(
-                        label: Text(_useDegrees
-                            ? '$d°'
-                            : _radToPiFraction(d * math.pi / 180)),
-                        onPressed: () =>
-                            setState(() => _angleDeg = d.toDouble()),
-                      ),
-                  ],
+                  children: [0, 30, 45, 60, 90, 120, 135, 150, 180, 270, 360]
+                      .map((d) => ActionChip(
+                            label: Text(_useDegrees
+                                ? '$d°'
+                                : _radToPiFraction(d * math.pi / 180)),
+                            onPressed: () =>
+                                setState(() => _angleDeg = d.toDouble()),
+                          ))
+                      .toList(),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 _infoCard(
                   'cos(θ)',
                   cosExact.isNotEmpty
@@ -236,12 +211,14 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
 
 class _UnitCirclePainter extends CustomPainter {
   final double angleRad;
-  _UnitCirclePainter({required this.angleRad});
+  final String angleLabel;
+
+  _UnitCirclePainter({required this.angleRad, required this.angleLabel});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 20;
+    final radius = math.min(size.width, size.height) / 2 - 28;
 
     final axisPaint = Paint()
       ..color = Colors.grey.shade400
@@ -249,13 +226,18 @@ class _UnitCirclePainter extends CustomPainter {
     final circlePaint = Paint()
       ..color = Colors.blue.shade700
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 2.2;
     final pointPaint = Paint()
       ..color = Colors.red
       ..style = PaintingStyle.fill;
     final linePaint = Paint()
-      ..color = Colors.red.shade300
-      ..strokeWidth = 2;
+      ..color = Colors.red.shade400
+      ..strokeWidth = 2.2;
+    final arcPaint = Paint()
+      ..color = Colors.orange.shade700
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
 
     canvas.drawLine(
       Offset(center.dx - radius - 10, center.dy),
@@ -269,10 +251,22 @@ class _UnitCirclePainter extends CustomPainter {
     );
     canvas.drawCircle(center, radius, circlePaint);
 
+    // Arc d'angle depuis (1,0) jusqu'au rayon
+    final rect = Rect.fromCircle(center: center, radius: radius * 0.28);
+    canvas.drawArc(rect, 0, -angleRad, false, arcPaint);
+
     final x = center.dx + radius * math.cos(angleRad);
     final y = center.dy - radius * math.sin(angleRad);
     canvas.drawLine(center, Offset(x, y), linePaint);
-    canvas.drawCircle(Offset(x, y), 7, pointPaint);
+    canvas.drawCircle(Offset(x, y), 8, pointPaint);
+    canvas.drawCircle(
+      Offset(x, y),
+      8,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
 
     final projPaint = Paint()
       ..color = Colors.green.shade400
@@ -280,9 +274,35 @@ class _UnitCirclePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     canvas.drawLine(Offset(x, y), Offset(x, center.dy), projPaint);
     canvas.drawLine(Offset(x, y), Offset(center.dx, y), projPaint);
+
+    // Label d'angle près du point rouge
+    final tp = TextPainter(
+      text: TextSpan(
+        text: angleLabel,
+        style: const TextStyle(
+          color: Colors.red,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    // Place le label un peu à l'extérieur du point
+    final labelOffset = Offset(
+      x + 12 * math.cos(angleRad) - tp.width / 2,
+      y - 12 * math.sin(angleRad) - tp.height / 2,
+    );
+    // Fond blanc pour lisibilité
+    final bg = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+          labelOffset.dx - 4, labelOffset.dy - 2, tp.width + 8, tp.height + 4),
+      const Radius.circular(6),
+    );
+    canvas.drawRRect(bg, Paint()..color = Colors.white.withOpacity(0.92));
+    tp.paint(canvas, labelOffset);
   }
 
   @override
   bool shouldRepaint(covariant _UnitCirclePainter old) =>
-      old.angleRad != angleRad;
+      old.angleRad != angleRad || old.angleLabel != angleLabel;
 }

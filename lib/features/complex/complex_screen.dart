@@ -4,9 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/models/complex_number.dart';
 import '../../data/services/complex_service.dart';
 import '../../data/services/math_library.dart';
-import '../../widgets/custom_button.dart';
 
-/// Nombres complexes + représentation sur le plan complexe
+/// Nombres complexes — nombre de points configurable + MathLibrary
 class ComplexScreen extends StatefulWidget {
   const ComplexScreen({super.key});
 
@@ -16,106 +15,125 @@ class ComplexScreen extends StatefulWidget {
 
 class _ComplexScreenState extends State<ComplexScreen> {
   final ComplexService _service = ComplexService();
-  final TextEditingController _aController = TextEditingController();
-  final TextEditingController _bController = TextEditingController();
+  int _count = 2;
+  late List<TextEditingController> _ctrls;
   String _result = '';
   String _extra = '';
-  ComplexNumber? _pointA;
-  ComplexNumber? _pointB;
-  ComplexNumber? _pointResult;
+  List<ComplexNumber> _points = [];
+  ComplexNumber? _resultPoint;
 
-  void _loadExample() {
-    setState(() {
-      _aController.text = '3+4i';
-      _bController.text = '1-2i';
-      _result = '';
-      _extra = '';
-      _pointA = _service.parse('3+4i');
-      _pointB = _service.parse('1-2i');
-      _pointResult = null;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _rebuildCtrls();
   }
 
-  void _compute(String op) {
-    final a = _service.parse(_aController.text);
-    final b = _service.parse(_bController.text);
+  void _rebuildCtrls() {
+    _ctrls = List.generate(
+      _count,
+      (i) => TextEditingController(
+        text: i == 0 ? '3+4i' : (i == 1 ? '1-2i' : '0'),
+      ),
+    );
+  }
 
-    if (a == null) {
+  @override
+  void dispose() {
+    for (final c in _ctrls) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  List<ComplexNumber?> _parseAll() =>
+      _ctrls.map((c) => _service.parse(c.text)).toList();
+
+  void _compute(String op) {
+    final parsed = _parseAll();
+    final valid = parsed.whereType<ComplexNumber>().toList();
+    if (valid.isEmpty) {
       setState(() {
-        _result = 'Nombre A invalide (ex: 3+4i)';
+        _result = 'Aucun nombre valide (ex: 3+4i)';
         _extra = '';
-        _pointA = null;
-        _pointResult = null;
+        _points = [];
+        _resultPoint = null;
       });
       return;
     }
 
     setState(() {
-      _pointA = a;
-      _pointB = b;
+      _points = valid;
       try {
         switch (op) {
           case '+':
-            if (b == null) {
-              _result = 'Nombre B invalide';
-              return;
+            var r = valid.first;
+            for (var i = 1; i < valid.length; i++) {
+              r = r + valid[i];
             }
-            final r = a + b;
             _result = r.toString();
-            _extra = r.toPolarString();
-            _pointResult = r;
+            _extra =
+                '${r.toPolarString()}\nModule = ${MathLibrary.format(r.modulus)}';
+            _resultPoint = r;
             break;
           case '−':
-            if (b == null) {
-              _result = 'Nombre B invalide';
+            if (valid.length < 2) {
+              _result = 'Il faut au moins 2 nombres';
               return;
             }
-            final r = a - b;
+            var r = valid.first;
+            for (var i = 1; i < valid.length; i++) {
+              r = r - valid[i];
+            }
             _result = r.toString();
             _extra = r.toPolarString();
-            _pointResult = r;
+            _resultPoint = r;
             break;
           case '×':
-            if (b == null) {
-              _result = 'Nombre B invalide';
-              return;
+            var r = valid.first;
+            for (var i = 1; i < valid.length; i++) {
+              r = r * valid[i];
             }
-            final r = a * b;
             _result = r.toString();
             _extra = r.toPolarString();
-            _pointResult = r;
+            _resultPoint = r;
             break;
           case '÷':
-            if (b == null) {
-              _result = 'Nombre B invalide';
+            if (valid.length < 2) {
+              _result = 'Il faut au moins 2 nombres';
               return;
             }
-            final r = a / b;
+            var r = valid.first;
+            for (var i = 1; i < valid.length; i++) {
+              r = r / valid[i];
+            }
             _result = r.toString();
             _extra = r.toPolarString();
-            _pointResult = r;
+            _resultPoint = r;
             break;
           case '|z|':
-            _result = MathLibrary.format(a.modulus);
-            _extra = 'Module de A';
-            _pointResult = a;
-            break;
-          case 'arg':
-            _result = '${MathLibrary.format(a.argument * 180 / math.pi)}°';
-            _extra = 'Argument de A';
-            _pointResult = a;
+            final lines = <String>[];
+            for (var i = 0; i < valid.length; i++) {
+              lines.add(
+                  'z${i + 1} : |z| = ${MathLibrary.format(valid[i].modulus)}  arg = ${MathLibrary.format(valid[i].argument)} rad');
+            }
+            _result = lines.join('\n');
+            _extra = '';
+            _resultPoint = valid.first;
             break;
           case 'conj':
-            final r = a.conjugate;
-            _result = r.toString();
-            _extra = r.toPolarString();
-            _pointResult = r;
+            final lines = valid
+                .map((z) => z.conjugate.toString())
+                .toList();
+            _result = lines.join('  ;  ');
+            _extra = 'Conjugués';
+            _resultPoint = valid.first.conjugate;
             break;
+          default:
+            _result = 'Opération inconnue';
         }
       } catch (e) {
         _result = 'Erreur : $e';
         _extra = '';
-        _pointResult = null;
       }
     });
   }
@@ -126,241 +144,162 @@ class _ComplexScreenState extends State<ComplexScreen> {
       appBar: AppBar(
         title: const Text('Nombres complexes'),
         actions: [
-          TextButton(
-            onPressed: _loadExample,
-            child: const Text('Exemple'),
+          IconButton(
+            icon: const Icon(Icons.lightbulb_outline),
+            onPressed: () {
+              setState(() {
+                _count = 2;
+                for (final c in _ctrls) {
+                  c.dispose();
+                }
+                _rebuildCtrls();
+              });
+            },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Forme a+bi (ex: 3+4i). Le plan complexe affiche A, B et le résultat.',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _aController,
-              decoration: InputDecoration(
-                labelText: 'Nombre A',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.looks_one),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _bController,
-              decoration: InputDecoration(
-                labelText: 'Nombre B (optionnel pour |z|, arg, conj)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.looks_two),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
               children: [
-                Expanded(
-                  child: CustomButton(
-                    label: '+',
-                    isOperator: true,
-                    onTap: () => _compute('+'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: CustomButton(
-                    label: '−',
-                    isOperator: true,
-                    onTap: () => _compute('−'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: CustomButton(
-                    label: '×',
-                    isOperator: true,
-                    onTap: () => _compute('×'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: CustomButton(
-                    label: '÷',
-                    isOperator: true,
-                    onTap: () => _compute('÷'),
-                  ),
+                const Text('Nombre de complexes :'),
+                const SizedBox(width: 12),
+                DropdownButton<int>(
+                  value: _count,
+                  items: [1, 2, 3, 4, 5, 6]
+                      .map((e) =>
+                          DropdownMenuItem(value: e, child: Text('$e')))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      for (final c in _ctrls) {
+                        c.dispose();
+                      }
+                      _count = v;
+                      _rebuildCtrls();
+                      _result = '';
+                      _points = [];
+                    });
+                  },
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomButton(
-                    label: '|z|',
-                    isOperator: true,
-                    onTap: () => _compute('|z|'),
+          ),
+          Expanded(
+            flex: 2,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _count,
+              itemBuilder: (_, i) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextField(
+                  controller: _ctrls[i],
+                  decoration: InputDecoration(
+                    labelText: 'z${i + 1}  (ex: 3+4i ou 2cis(π/3))',
+                    border: const OutlineInputBorder(),
+                    isDense: true,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: CustomButton(
-                    label: 'arg',
-                    isOperator: true,
-                    onTap: () => _compute('arg'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: CustomButton(
-                    label: 'conj',
-                    isOperator: true,
-                    onTap: () => _compute('conj'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Résultat',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _result.isEmpty ? '—' : _result,
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (_extra.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _extra,
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ],
                 ),
               ),
-            ).animate().fadeIn(),
-            const SizedBox(height: 20),
-            Text(
-              'Plan complexe',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 260,
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final op in ['+', '−', '×', '÷', '|z|', 'conj'])
+                ActionChip(
+                  label: Text(op),
+                  onPressed: () => _compute(op),
+                ),
+            ],
+          ),
+          if (_result.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: CustomPaint(
-                  painter: _ComplexPlanePainter(
-                    a: _pointA,
-                    b: _pointB,
-                    result: _pointResult,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_result,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                      if (_extra.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(_extra),
+                      ],
+                    ],
                   ),
-                  child: Container(),
                 ),
               ),
-            ).animate().fadeIn(delay: 100.ms),
-            const SizedBox(height: 8),
-            Text(
-              'Bleu = A · Orange = B · Rouge = résultat',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              textAlign: TextAlign.center,
             ),
-          ],
-        ),
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: CustomPaint(
+                painter: _ComplexPlanePainter(
+                  points: _points,
+                  result: _resultPoint,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _ComplexPlanePainter extends CustomPainter {
-  final ComplexNumber? a;
-  final ComplexNumber? b;
+  final List<ComplexNumber> points;
   final ComplexNumber? result;
 
-  _ComplexPlanePainter({this.a, this.b, this.result});
+  _ComplexPlanePainter({required this.points, this.result});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final scale = math.min(size.width, size.height) / 14;
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final scale = math.min(size.width, size.height) / 12;
 
     final axis = Paint()
       ..color = Colors.grey.shade400
       ..strokeWidth = 1;
-    canvas.drawLine(
-      Offset(20, center.dy),
-      Offset(size.width - 20, center.dy),
-      axis,
-    );
-    canvas.drawLine(
-      Offset(center.dx, 20),
-      Offset(center.dx, size.height - 20),
-      axis,
-    );
+    canvas.drawLine(Offset(0, cy), Offset(size.width, cy), axis);
+    canvas.drawLine(Offset(cx, 0), Offset(cx, size.height), axis);
 
-    // Grille légère
-    final grid = Paint()
-      ..color = Colors.grey.shade200
-      ..strokeWidth = 0.5;
-    for (var i = -6; i <= 6; i++) {
-      if (i == 0) continue;
-      final x = center.dx + i * scale;
-      final y = center.dy - i * scale;
-      canvas.drawLine(Offset(x, 20), Offset(x, size.height - 20), grid);
-      canvas.drawLine(Offset(20, y), Offset(size.width - 20, y), grid);
+    final colors = [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.brown,
+    ];
+
+    for (var i = 0; i < points.length; i++) {
+      final z = points[i];
+      final p = Offset(cx + z.real * scale, cy - z.imag * scale);
+      canvas.drawLine(
+          Offset(cx, cy), p, Paint()..color = colors[i % colors.length]);
+      canvas.drawCircle(p, 6, Paint()..color = colors[i % colors.length]);
     }
 
-    void drawPoint(ComplexNumber? z, Color color, String label) {
-      if (z == null) return;
-      final p = Offset(
-        center.dx + z.real * scale,
-        center.dy - z.imag * scale,
-      );
-      final line = Paint()
-        ..color = color.withOpacity(0.5)
-        ..strokeWidth = 1.5;
-      canvas.drawLine(center, p, line);
-      canvas.drawCircle(p, 7, Paint()..color = color);
-      final tp = TextPainter(
-        text: TextSpan(
-          text: label,
-          style: TextStyle(
-            color: color,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, p + const Offset(8, -14));
+    if (result != null) {
+      final p =
+          Offset(cx + result!.real * scale, cy - result!.imag * scale);
+      canvas.drawCircle(p, 8, Paint()..color = Colors.red);
     }
-
-    drawPoint(a, const Color(0xFF1565C0), 'A');
-    drawPoint(b, const Color(0xFFEF6C00), 'B');
-    drawPoint(result, const Color(0xFFC62828), 'R');
   }
 
   @override
-  bool shouldRepaint(covariant _ComplexPlanePainter old) =>
-      old.a != a || old.b != b || old.result != result;
+  bool shouldRepaint(covariant _ComplexPlanePainter old) => true;
 }

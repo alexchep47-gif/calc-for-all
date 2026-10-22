@@ -18,6 +18,7 @@ import '../../features/sequences/sequences_screen.dart';
 import '../../features/geometry/geometry_screen.dart';
 import '../../features/exercises/exercises_screen.dart';
 import '../../features/library/math_library_screen.dart';
+import '../../features/ocr/ocr_screen.dart';
 
 class AppRoutes {
   static const String onboarding = '/';
@@ -39,6 +40,7 @@ class AppRoutes {
   static const String geometry = '/geometry';
   static const String exercises = '/exercises';
   static const String library = '/library';
+  static const String ocr = '/ocr';
 
   static Map<String, WidgetBuilder> get routes => {
         onboarding: (context) => const OnboardingScreen(),
@@ -60,5 +62,7 @@ class AppRoutes {
         geometry: (context) => const GeometryScreen(),
         exercises: (context) => const ExercisesScreen(),
         library: (context) => const MathLibraryScreen(),
+        ocr: (context) => const OcrScreen(),
       };
 }
+

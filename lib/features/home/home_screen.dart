@@ -92,6 +92,12 @@ class HomeScreen extends StatelessWidget {
             const Color(0xFFEF6C00),
             AppRoutes.statistics),
         _Module(
+            loc.t('OCR', 'OCR'),
+            loc.t('Lecture hors ligne', 'Offline reading'),
+            Icons.document_scanner_rounded,
+            const Color(0xFF7B1FA2),
+            AppRoutes.ocr),
+        _Module(
             loc.t('Complexes', 'Complex numbers'),
             loc.t('Module, argument, plan', 'Modulus, argument, plane'),
             Icons.blur_on_rounded,
@@ -109,12 +115,6 @@ class HomeScreen extends StatelessWidget {
             Icons.history_rounded,
             const Color(0xFF546E7A),
             AppRoutes.history),
-        _Module(
-            loc.t('Paramètres', 'Settings'),
-            loc.t('Thème, langue, affichage', 'Theme, language, display'),
-            Icons.settings_rounded,
-            const Color(0xFF607D8B),
-            AppRoutes.settings),
       ];
 
   @override
@@ -245,3 +245,4 @@ class _ModuleCard extends StatelessWidget {
     );
   }
 }
+

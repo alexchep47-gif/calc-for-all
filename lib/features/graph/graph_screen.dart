@@ -13,6 +13,7 @@ import '../../data/services/graph_service.dart';
 import '../../data/services/function_analysis_service.dart';
 import '../../data/services/math_expression_engine.dart';
 import '../../data/services/math_library.dart';
+import '../../data/services/math_pretty.dart';
 
 const _desmosColors = [
   Color(0xFF2D70B3),
@@ -350,9 +351,9 @@ class _GraphScreenState extends State<GraphScreen>
         build: (_) => [
           pw.Text('Etude - Calc For All',
               style: pw.TextStyle(font: bold, fontSize: 18)),
-          pw.Text('f(x) = ${_study!.expression}'),
+          pw.Text(MathPretty.functionLine(_study!.expression)),
           pw.Text(_study!.domain),
-          pw.Text("f' = ${_study!.derivative}"),
+          pw.Text(MathPretty.derivativeLine(_study!.derivative)),
           pw.Text(_study!.variationTable),
         ],
       ));
@@ -630,10 +631,10 @@ class _GraphScreenState extends State<GraphScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _card('Fonction', 'f(x) = ${_study!.expression}'),
+        _card('Fonction', MathPretty.functionLine(_study!.expression)),
         _card('Domaine', _study!.domain),
-        _card("f'(x)", _study!.derivative),
-        _card("f''(x)", _study!.secondDerivative),
+        _card('f′(x)', MathPretty.format(_study!.derivative)),
+        _card('f″(x)', MathPretty.format(_study!.secondDerivative)),
         _card('Racines (f=0)', _study!.roots.join('\n')),
         _card("Ordonnee a l'origine", _study!.intercepts.join('\n')),
         _card("Extrema (f'=0)", _study!.extrema.join('\n')),
@@ -648,6 +649,7 @@ class _GraphScreenState extends State<GraphScreen>
   }
 
   Widget _card(String t, String c) {
+    final isMath = t.contains('f') || t.contains('Fonction');
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -657,7 +659,15 @@ class _GraphScreenState extends State<GraphScreen>
           children: [
             Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Text(c, style: const TextStyle(height: 1.35)),
+            Text(
+              c,
+              style: TextStyle(
+                height: 1.45,
+                fontSize: isMath ? 17 : 14,
+                fontWeight: isMath ? FontWeight.w500 : FontWeight.normal,
+                letterSpacing: isMath ? 0.3 : 0,
+              ),
+            ),
           ],
         ),
       ),

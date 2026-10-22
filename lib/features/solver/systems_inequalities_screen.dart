@@ -16,14 +16,12 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
 
-  // —— Système ——
   int _nEq = 2;
   int _nVar = 2;
-  late List<List<TextEditingController>> _coeff; // [eq][var + constant]
+  late List<List<TextEditingController>> _coeff;
   String _sysResult = '';
   String _sysSteps = '';
 
-  // —— Inéquation ——
   final _ineqCtrl = TextEditingController(text: 'x^2 - 1');
   String _ineqOp = '>';
   String _ineqResult = '';
@@ -74,20 +72,20 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
   String _fmt(double v) => MathLibrary.format(v);
 
   void _solveSystem() {
-    // Matrice augmentée nEq × (nVar+1)
     final a = List.generate(
       _nEq,
       (i) => List.generate(_nVar + 1, (j) => _parse(_coeff[i][j].text)),
     );
     final steps = StringBuffer();
     steps.writeln('Système $_nEq équation(s), $_nVar inconnue(s)');
+    steps.writeln(
+        'Coefficients réels (fractions OK via MathLibrary).');
     steps.writeln('Matrice augmentée :');
     for (final row in a) {
       steps.writeln(row.map(_fmt).join('  |  '));
     }
     steps.writeln();
 
-    // Gauss-Jordan sur la partie carrée si possible
     final n = _nEq < _nVar ? _nEq : _nVar;
     final m = a.map((r) => List<double>.from(r)).toList();
 
@@ -118,9 +116,26 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
       steps.writeln(row.map(_fmt).join('  |  '));
     }
 
+    // Détection système incompatible → ∅
+    var inconsistent = false;
+    for (final row in m) {
+      final allZero = row.take(_nVar).every((v) => v.abs() < 1e-10);
+      if (allZero && row.last.abs() > 1e-10) {
+        inconsistent = true;
+        break;
+      }
+    }
+
+    if (inconsistent) {
+      setState(() {
+        _sysResult = '∅  (ensemble vide — système incompatible)';
+        _sysSteps = steps.toString();
+      });
+      return;
+    }
+
     final sols = <String>[];
     for (var i = 0; i < n && i < m.length; i++) {
-      // Cherche pivot
       var pivotCol = -1;
       for (var j = 0; j < _nVar; j++) {
         if (m[i][j].abs() > 1e-9) {
@@ -135,7 +150,9 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     }
 
     setState(() {
-      _sysResult = sols.isEmpty ? 'Aucune solution unique détectée' : sols.join('  ;  ');
+      _sysResult = sols.isEmpty
+          ? '∅  (ensemble vide — aucune solution unique)'
+          : sols.join('  ;  ');
       _sysSteps = steps.toString();
     });
   }
@@ -148,7 +165,6 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     steps.writeln('avec f(x) = $expr');
     steps.writeln();
 
-    // Cherche racines numériques sur [-10,10]
     final roots = <double>[];
     const n = 400;
     const xMin = -10.0, xMax = 10.0;
@@ -187,7 +203,6 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     steps.writeln(
         'Racines de f (f=0) : ${roots.isEmpty ? 'aucune sur [-10;10]' : roots.map(_fmt).join(', ')}');
 
-    // Intervalles de vérité
     final bounds = [-10.0, ...roots, 10.0];
     final intervals = <String>[];
     for (var i = 0; i < bounds.length - 1; i++) {
@@ -212,17 +227,11 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     } else {
       steps.writeln(intervals.join(' ∪ '));
     }
-    steps.writeln();
-    steps.writeln('Représentation : sur la droite réelle, hachurer ces intervalles.');
-    steps.writeln('Les racines ${roots.map(_fmt).join(', ')} sont ');
-    steps.writeln(_ineqOp.contains('=') ? 'incluses (plein).' : 'exclues (creux).');
 
     setState(() {
       _ineqResult = intervals.isEmpty ? '∅' : intervals.join(' ∪ ');
-      _sysSteps = steps.toString(); // reuse steps display for ineq too via result area
+      _sysSteps = steps.toString();
     });
-    _sysSteps = steps.toString();
-    setState(() {});
   }
 
   @override
@@ -289,7 +298,7 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
         ),
         const SizedBox(height: 8),
         const Text(
-          'Coefficients (fractions acceptées : 1/2, -3/4). Dernière colonne = constante.',
+          'Coefficients (fractions : 1/2, -3/4). Dernière colonne = constante.',
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: 8),
@@ -298,7 +307,8 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(
               children: [
-                Text('E${i + 1}:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('E${i + 1}:',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(width: 6),
                 ...List.generate(_nVar + 1, (j) {
                   final label = j < _nVar
@@ -309,7 +319,6 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: TextField(
                         controller: _coeff[i][j],
-                        keyboardType: TextInputType.text,
                         decoration: InputDecoration(
                           labelText: label,
                           isDense: true,
@@ -339,7 +348,8 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
             ),
           ),
           const SizedBox(height: 8),
-          Text(_sysSteps, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+          Text(_sysSteps,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
         ],
       ],
     );
@@ -385,7 +395,8 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
                   const Text('Ensemble solution :',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   Text(_ineqResult,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),

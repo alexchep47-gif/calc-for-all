@@ -54,6 +54,7 @@ jobs:
       - name: Build Flutter Web for /app/
         run: |
           flutter build web --release --base-href "/app/"
+          echo "Built version:"
           cat build/web/version.json
 
       - uses: actions/upload-artifact@v4
@@ -61,19 +62,28 @@ jobs:
           name: calc-for-all-web
           path: build/web
 
-      # Deploie dans calc-for-all-web/app si le secret GH_PAT existe
-      # (token perso avec droit repo sur alexchep47-gif/calc-for-all-web)
+      # Deploy vers calc-for-all-web/app (Vercel). Token via env, pas dans if.
       - name: Deploy to calc-for-all-web /app
-        if: ${{ secrets.GH_PAT != '' }}
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          personal_token: ${{ secrets.GH_PAT }}
-          external_repository: alexchep47-gif/calc-for-all-web
-          publish_dir: ./build/web
-          destination_dir: app
-          publish_branch: main
-          keep_files: false
-          allow_empty_commit: false
-          user_name: github-actions[bot]
-          user_email: github-actions[bot]@users.noreply.github.com
-          commit_message: Deploy Flutter Web ${{ github.sha }}
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$GH_PAT" ]; then
+            echo "GH_PAT absent — skip deploy Vercel (artifact web disponible)"
+            exit 0
+          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf /tmp/cfa-web
+          git clone --depth 1 "https://x-access-token:${GH_PAT}@github.com/alexchep47-gif/calc-for-all-web.git" /tmp/cfa-web
+          rm -rf /tmp/cfa-web/app
+          mkdir -p /tmp/cfa-web/app
+          cp -a build/web/. /tmp/cfa-web/app/
+          echo "${{ github.sha }}" > /tmp/cfa-web/app/.last_build_id
+          echo "${{ github.sha }}" > /tmp/cfa-web/.calc-for-all-source-sha
+          cd /tmp/cfa-web
+          git add -A
+          git status
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Deploy Flutter Web 2.8.1 ${{ github.sha }}"
+          git push origin main
+          echo "Deployed to calc-for-all-web/app — Vercel will pick up"

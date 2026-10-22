@@ -29,27 +29,54 @@ class MathExpressionEngine {
     }
   }
 
-  /// Domaine de trace raisonnable (log, sqrt, denoms, constantes e/pi).
-  ({double xMin, double xMax}) suggestDomain(
-    String input, {
-    double fallbackMin = -10,
-    double fallbackMax = 10,
-  }) {
+  /// True si l'expression est principalement trigonometrique (sin/cos/tan de x).
+  bool isTrigExpression(String input) {
+    final e = normalize(input);
+    final trig = RegExp(r'\b(sin|cos|tan|sec|csc|cot)\s*\(');
+    if (!trig.hasMatch(e)) return false;
+    // Evite de traiter asin/acos comme fenetre π
+    if (RegExp(r'\b(asin|acos|atan|sinh|cosh|tanh)\s*\(').hasMatch(e) &&
+        !RegExp(r'\b(sin|cos|tan)\s*\(').hasMatch(e.replaceAll(RegExp(r'a(sin|cos|tan)'), ''))) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Fenetre type Desmos.
+  /// Trig : X ∈ [-2π, 2π], Y ∈ [-2, 2]
+  /// Sinon : domaine adapte + scan numerique
+  ({double xMin, double xMax, double yMin, double yMax, bool piLabels})
+      suggestWindow(String input) {
     final expr = normalize(input);
 
-    // log(x - c) ou log(x + c) avec c numerique ou e/pi
+    if (isTrigExpression(expr)) {
+      const twoPi = 2 * math.pi;
+      return (
+        xMin: -twoPi,
+        xMax: twoPi,
+        yMin: -2.0,
+        yMax: 2.0,
+        piLabels: true,
+      );
+    }
+
+    // log(x - c)
     final logXc = RegExp(
       r'log\(\s*x\s*([+-])\s*(e|pi|\d*\.?\d+)\s*\)',
     ).firstMatch(expr);
     if (logXc != null) {
       final sign = logXc.group(1) == '-' ? -1.0 : 1.0;
       final c = _constValue(logXc.group(2)!);
-      final bound = -sign * c; // x + sign*c > 0 => x > -sign*c
-      // Pour log(x-e): sign=-1, c=e => bound = e
-      return (xMin: bound + 0.05, xMax: bound + 12);
+      final bound = -sign * c;
+      return (
+        xMin: bound + 0.05,
+        xMax: bound + 10,
+        yMin: -5,
+        yMax: 5,
+        piLabels: false,
+      );
     }
 
-    // log(ax+b)
     final logMatch = RegExp(
       r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
     ).firstMatch(expr);
@@ -58,15 +85,27 @@ class MathExpressionEngine {
       final b = double.tryParse(logMatch.group(2) ?? '0') ?? 0;
       if (a > 0) {
         final bound = -b / a;
-        return (xMin: bound + 0.05, xMax: bound + 12);
+        return (
+          xMin: bound + 0.05,
+          xMax: bound + 10,
+          yMin: -5,
+          yMax: 5,
+          piLabels: false,
+        );
       }
       if (a < 0) {
         final bound = -b / a;
-        return (xMin: bound - 12, xMax: bound - 0.05);
+        return (
+          xMin: bound - 10,
+          xMax: bound - 0.05,
+          yMin: -5,
+          yMax: 5,
+          piLabels: false,
+        );
       }
     }
     if (RegExp(r'log\(x\)').hasMatch(expr)) {
-      return (xMin: 0.05, xMax: 10);
+      return (xMin: 0.05, xMax: 10, yMin: -5, yMax: 5, piLabels: false);
     }
 
     final sqrtMatch = RegExp(
@@ -77,19 +116,41 @@ class MathExpressionEngine {
       final b = double.tryParse(sqrtMatch.group(2) ?? '0') ?? 0;
       if (a > 0) {
         final bound = -b / a;
-        return (xMin: bound, xMax: bound + 12);
-      }
-      if (a < 0) {
-        final bound = -b / a;
-        return (xMin: bound - 12, xMax: bound);
+        return (
+          xMin: bound,
+          xMax: bound + 10,
+          yMin: -2,
+          yMax: 8,
+          piLabels: false,
+        );
       }
     }
 
-    // Scan numerique : trouver le premier intervalle ou f est definie
+    // Par defaut style Desmos non-trig : [-10, 10] x [-10, 10] orthonorme
     final scan = _scanDomain(expr, -20, 20);
-    if (scan != null) return scan;
+    if (scan != null) {
+      final span = math.max(scan.xMax - scan.xMin, 6.0);
+      final mid = (scan.xMin + scan.xMax) / 2;
+      return (
+        xMin: mid - span / 2,
+        xMax: mid + span / 2,
+        yMin: -span / 2,
+        yMax: span / 2,
+        piLabels: false,
+      );
+    }
 
-    return (xMin: fallbackMin, xMax: fallbackMax);
+    return (xMin: -10, xMax: 10, yMin: -10, yMax: 10, piLabels: false);
+  }
+
+  /// Compat ancien API
+  ({double xMin, double xMax}) suggestDomain(
+    String input, {
+    double fallbackMin = -10,
+    double fallbackMax = 10,
+  }) {
+    final w = suggestWindow(input);
+    return (xMin: w.xMin, xMax: w.xMax);
   }
 
   ({double xMin, double xMax})? _scanDomain(

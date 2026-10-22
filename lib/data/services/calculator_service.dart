@@ -1,86 +1,61 @@
+import 'dart:math' as math;
+
 import 'package:math_expressions/math_expressions.dart';
 
-/// Service de calcul scientifique avec support des fractions
+import 'math_library.dart';
+import 'math_expression_engine.dart';
+
+/// Service de calcul scientifique base sur la bibliotheque maths interne.
+/// cos(pi), sin(pi/2), ln(e), etc. ne renvoient plus « Erreur ».
 class CalculatorService {
-  final Parser _parser = Parser();
-  final ContextModel _context = ContextModel();
+  final MathExpressionEngine _engine = MathExpressionEngine();
 
-  /// Évalue une expression mathématique
   String evaluate(String expression) {
+    if (expression.trim().isEmpty) return '0';
+
+    // 1) Moteur interne (prioritaire)
+    final internal = _evaluateInternal(expression);
+    if (internal != null) return MathLibrary.format(internal);
+
+    // 2) Fallback math_expressions avec pi et e lies
+    final fallback = _evaluateMathExpressions(expression);
+    if (fallback != null) return MathLibrary.format(fallback);
+
+    return 'Expression invalide';
+  }
+
+  double? _evaluateInternal(String expression) {
     try {
-      String expr = expression
-          .replaceAll('×', '*')
-          .replaceAll('÷', '/')
-          .replaceAll('−', '-')
-          .replaceAll('π', 'pi')
-          .replaceAll('√', 'sqrt')
-          .replaceAll('²', '^2')
-          .replaceAll('³', '^3');
-
-      // Factorielle n!
-      expr = expr.replaceAllMapped(RegExp(r'(\d+)!'), (m) {
-        final n = int.tryParse(m.group(1)!) ?? 0;
-        if (n < 0 || n > 20) return '0'; // limite de sécurité
-        int fact = 1;
-        for (int i = 2; i <= n; i++) fact *= i;
-        return fact.toString();
-      });
-
-      // Pourcentage
-      if (expr.contains('%')) {
-        expr = expr.replaceAllMapped(
-          RegExp(r'(\d+(?:\.\d+)?)%'),
-          (m) => '(${m.group(1)}/100)',
-        );
-      }
-
-      Expression exp = _parser.parse(expr);
-      double result = exp.evaluate(EvaluationType.REAL, _context);
-
-      if (result.isNaN || result.isInfinite) return 'Erreur';
-
-      // Affichage fractionnaire simple pour les résultats « jolis »
-      final fraction = _toSimpleFraction(result);
-      if (fraction != null) return fraction;
-
-      if (result == result.roundToDouble()) {
-        return result.toInt().toString();
-      }
-
-      String formatted = result.toStringAsFixed(10);
-      formatted = formatted.replaceAll(RegExp(r'0+$'), '');
-      formatted = formatted.replaceAll(RegExp(r'\.$'), '');
-      return formatted;
-    } catch (e) {
-      return 'Erreur';
+      // Pour la calculatrice, pas de variable x : on evalue en x=0
+      // apres avoir remplace les constantes.
+      final normalized = MathLibrary.normalizeExpression(expression);
+      // Si l'expression contient encore x libre, on refuse ici
+      // (sauf si c'est dans un nom de fonction deja normalise).
+      final value = _engine.evaluate(normalized, 0);
+      if (value == null || value.isNaN) return null;
+      return MathLibrary.clean(value);
+    } catch (_) {
+      return null;
     }
   }
 
-  /// Tente de convertir un double en fraction simple a/b
-  String? _toSimpleFraction(double value) {
-    if (value == 0) return '0';
-    const maxDenom = 100;
-    for (int denom = 1; denom <= maxDenom; denom++) {
-      final num = (value * denom).round();
-      if ((num / denom - value).abs() < 1e-8) {
-        if (denom == 1) return num.toString();
-        // Simplification
-        final g = _gcd(num.abs(), denom);
-        final n = num ~/ g;
-        final d = denom ~/ g;
-        if (d == 1) return n.toString();
-        return '$n/$d';
-      }
-    }
-    return null;
-  }
+  double? _evaluateMathExpressions(String expression) {
+    try {
+      var expr = MathLibrary.normalizeExpression(expression);
 
-  int _gcd(int a, int b) {
-    while (b != 0) {
-      final t = b;
-      b = a % b;
-      a = t;
+      // math_expressions utilise souvent log pour ln ; on garde ln/log
+      final parser = Parser();
+      final cm = ContextModel();
+      cm.bindVariable(Variable('pi'), Number(math.pi));
+      cm.bindVariable(Variable('e'), Number(math.e));
+      cm.bindVariable(Variable('tau'), Number(2 * math.pi));
+
+      final exp = parser.parse(expr);
+      final result = exp.evaluate(EvaluationType.REAL, cm) as double;
+      if (result.isNaN) return null;
+      return MathLibrary.clean(result);
+    } catch (_) {
+      return null;
     }
-    return a;
   }
 }

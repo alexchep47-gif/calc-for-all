@@ -1,70 +1,20 @@
 import 'dart:math' as math;
 
-/// Moteur hors-ligne : opérateurs, fonctions usuelles, multiplication implicite.
+import 'math_library.dart';
+
+/// Moteur hors-ligne : parse, evalue, derive — s'appuie sur [MathLibrary].
 class MathExpressionEngine {
-  static const _functions = {
-    'sin',
-    'cos',
-    'tan',
-    'asin',
-    'acos',
-    'atan',
-    'sqrt',
-    'abs',
-    'log',
-    'ln',
-    'in', // autocorrect clavier FR (In → in)
-    'exp',
-    'floor',
-    'ceil',
-  };
+  /// Nettoie l'entree via la bibliotheque maths
+  String normalize(String input) => MathLibrary.normalizeExpression(input);
 
-  /// Nettoie l'entrée : 2x → 2*x, ln/In → log, ^, π, etc.
-  String normalize(String input) {
-    var source = input
-        .replaceAll('×', '*')
-        .replaceAll('·', '*')
-        .replaceAll('÷', '/')
-        .replaceAll('−', '-')
-        .replaceAll('π', 'pi')
-        .replaceAll('√', 'sqrt')
-        .replaceAll('²', '^2')
-        .replaceAll('³', '^3')
-        .replaceAll(',', '.')
-        .replaceAll(' ', '');
-
-    // Autocorrect courant : In / LN → ln
-    source = source
-        .replaceAll(RegExp(r'\bIn\b'), 'ln')
-        .replaceAll(RegExp(r'\bIN\b'), 'ln')
-        .replaceAll(RegExp(r'\bLn\b'), 'ln');
-
-    final tokens = _tokenize(source.toLowerCase());
-    final out = <String>[];
-    for (var i = 0; i < tokens.length; i++) {
-      var current = tokens[i];
-      // ln / in → log (logarithme naturel)
-      if (current == 'ln' || current == 'in') current = 'log';
-
-      if (out.isNotEmpty &&
-          _endsValue(out.last) &&
-          _startsValue(current) &&
-          !(out.last == ')' && current == '(') &&
-          !(_isFunction(out.last) && current == '(')) {
-        out.add('*');
-      }
-      out.add(current);
-    }
-    return out.join();
-  }
-
-  double? evaluate(String input, double x) {
+  double? evaluate(String input, [double x = 0]) {
     try {
       final normalized = normalize(input);
       final root = _Parser(_tokenize(normalized)).parse();
       final value = root.evaluate(x);
-      if (value.isNaN || !value.isFinite) return null;
-      return value;
+      if (value.isNaN) return null;
+      if (!value.isFinite) return value; // +/-inf utile parfois
+      return MathLibrary.clean(value);
     } catch (_) {
       return null;
     }
@@ -80,7 +30,6 @@ class MathExpressionEngine {
     }
   }
 
-  /// Estime un intervalle de tracé raisonnable (évite ln de négatif, etc.).
   ({double xMin, double xMax}) suggestDomain(
     String input, {
     double fallbackMin = -10,
@@ -88,7 +37,6 @@ class MathExpressionEngine {
   }) {
     final expr = normalize(input);
 
-    // log(ax+b) → ax+b > 0
     final logMatch = RegExp(
       r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
     ).firstMatch(expr);
@@ -108,7 +56,6 @@ class MathExpressionEngine {
       return (xMin: 0.05, xMax: 10);
     }
 
-    // sqrt(ax+b) → ax+b ≥ 0
     final sqrtMatch = RegExp(
       r'sqrt\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
     ).firstMatch(expr);
@@ -162,29 +109,11 @@ class MathExpressionEngine {
         result.add(c);
         i++;
       } else {
-        i++; // ignorer caractères inconnus plutôt que planter
+        i++;
       }
     }
     return result;
   }
-
-  bool _endsValue(String token) =>
-      token == ')' ||
-      _isNumber(token) ||
-      token == 'x' ||
-      token == 'pi' ||
-      token == 'e';
-
-  bool _startsValue(String token) =>
-      token == '(' ||
-      _isNumber(token) ||
-      token == 'x' ||
-      token == 'pi' ||
-      token == 'e' ||
-      _isFunction(token);
-
-  bool _isFunction(String token) => _functions.contains(token);
-  bool _isNumber(String token) => double.tryParse(token) != null;
 }
 
 abstract class _Node {
@@ -227,7 +156,19 @@ class _Constant extends _Node {
   final String name;
   _Constant(this.name);
   @override
-  double evaluate(double x) => name == 'pi' ? math.pi : math.e;
+  double evaluate(double x) {
+    switch (name) {
+      case 'pi':
+        return MathLibrary.pi;
+      case 'e':
+        return MathLibrary.e;
+      case 'tau':
+        return MathLibrary.tau;
+      default:
+        return double.nan;
+    }
+  }
+
   @override
   _Node derivative() => _Number(0);
   @override
@@ -272,7 +213,7 @@ class _Binary extends _Node {
       case '/':
         return b == 0 ? double.nan : a / b;
       case '^':
-        return math.pow(a, b).toDouble();
+        return MathLibrary.pow(a, b);
     }
     return double.nan;
   }
@@ -343,33 +284,7 @@ class _Function extends _Node {
   double evaluate(double x) {
     final a = argument.evaluate(x);
     if (a.isNaN) return double.nan;
-    switch (name) {
-      case 'log':
-        return a > 0 ? math.log(a) : double.nan;
-      case 'sin':
-        return math.sin(a);
-      case 'cos':
-        return math.cos(a);
-      case 'tan':
-        return math.tan(a);
-      case 'sqrt':
-        return a >= 0 ? math.sqrt(a) : double.nan;
-      case 'abs':
-        return a.abs();
-      case 'exp':
-        return math.exp(a);
-      case 'asin':
-        return a.abs() <= 1 ? math.asin(a) : double.nan;
-      case 'acos':
-        return a.abs() <= 1 ? math.acos(a) : double.nan;
-      case 'atan':
-        return math.atan(a);
-      case 'floor':
-        return a.floorToDouble();
-      case 'ceil':
-        return a.ceilToDouble();
-    }
-    return double.nan;
+    return MathLibrary.call1(name, a);
   }
 
   @override
@@ -377,6 +292,7 @@ class _Function extends _Node {
     final d = argument.derivative();
     switch (name) {
       case 'log':
+      case 'ln':
         return _Binary('/', d, argument);
       case 'sin':
         return _Binary('*', _Function('cos', argument), d);
@@ -494,22 +410,22 @@ class _Parser {
     final number = double.tryParse(t);
     if (number != null) return _Number(number);
     if (t == 'x') return _Variable();
-    if (t == 'pi' || t == 'e') return _Constant(t);
+    if (t == 'pi' || t == 'e' || t == 'tau') return _Constant(t);
     if (t == '(') {
       final n = _expression();
       if (index >= tokens.length || tokens[index++] != ')') {
-        throw FormatException('Parenthèse manquante');
+        throw FormatException('Parenthese manquante');
       }
       return n;
     }
-    if (MathExpressionEngine._functions.contains(t) || t == 'log') {
+    if (MathLibrary.functionNames.contains(t) || t == 'ln' || t == 'in') {
       final name = (t == 'ln' || t == 'in') ? 'log' : t;
       if (index >= tokens.length || tokens[index++] != '(') {
-        throw FormatException('Parenthèse attendue');
+        throw FormatException('Parenthese attendue apres $t');
       }
       final n = _Function(name, _expression());
       if (index >= tokens.length || tokens[index++] != ')') {
-        throw FormatException('Parenthèse manquante');
+        throw FormatException('Parenthese manquante');
       }
       return n;
     }

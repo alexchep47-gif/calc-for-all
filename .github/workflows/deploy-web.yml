@@ -18,29 +18,35 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure GitHub Pages
         id: pages
         uses: actions/configure-pages@v5
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: stable
           cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
-      - name: Build Web release
-        run: flutter build web --release --web-renderer html --pwa-strategy none --base-href "${{ steps.pages.outputs.base_path }}/"
+      - name: Build Web release (V2.7+)
+        run: |
+          echo "Building version from pubspec:"
+          grep '^version:' pubspec.yaml
+          flutter build web --release --base-href "${{ steps.pages.outputs.base_path }}/"
+          echo "Built version.json:"
+          cat build/web/version.json
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
+          path: build/web
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: calc-for-all-web-v27
           path: build/web
 
   deploy:

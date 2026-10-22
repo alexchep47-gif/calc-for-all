@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -43,29 +46,34 @@ jobs:
 
       - run: flutter pub get
 
-      - name: Prepare web platform
+      - name: Prepare web
         run: |
           flutter config --enable-web
-          flutter create --project-name calc_for_all --platforms=web .
+          flutter create --project-name calc_for_all --platforms=web . || true
 
       - name: Build Flutter Web for /app/
-        run: flutter build web --release --base-href "/app/"
+        run: |
+          flutter build web --release --base-href "/app/"
+          cat build/web/version.json
 
       - uses: actions/upload-artifact@v4
         with:
           name: calc-for-all-web
           path: build/web
 
-      # Deploie dans le depot calc-for-all-web sous /app
+      # Deploie dans calc-for-all-web/app si le secret GH_PAT existe
+      # (token perso avec droit repo sur alexchep47-gif/calc-for-all-web)
       - name: Deploy to calc-for-all-web /app
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ secrets.GH_PAT != '' }}
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          source-directory: build/web
-          destination-github-username: alexchep47-gif
-          destination-repository-name: calc-for-all-web
-          user-email: github-actions[bot]@users.noreply.github.com
-          target-branch: main
-          target-directory: app
-        continue-on-error: true
+          personal_token: ${{ secrets.GH_PAT }}
+          external_repository: alexchep47-gif/calc-for-all-web
+          publish_dir: ./build/web
+          destination_dir: app
+          publish_branch: main
+          keep_files: false
+          allow_empty_commit: false
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: Deploy Flutter Web ${{ github.sha }}

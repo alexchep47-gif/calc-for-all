@@ -35,7 +35,7 @@ class _GraphScreenState extends State<GraphScreen>
   final MathExpressionEngine _engine = MathExpressionEngine();
 
   final List<TextEditingController> _exprCtrls = [
-    TextEditingController(text: 'sin(x)'),
+    TextEditingController(text: 'x^3-3*x'),
   ];
   final List<bool> _exprVisible = [true];
   final TextEditingController _numController = TextEditingController();
@@ -43,14 +43,13 @@ class _GraphScreenState extends State<GraphScreen>
 
   List<List<List<MapEntry<double, double>>>> _allSegments = [];
   FunctionStudyResult? _study;
-  double _xMin = -2 * math.pi, _xMax = 2 * math.pi;
-  double _yMin = -2, _yMax = 2;
+  double _xMin = -10, _xMax = 10, _yMin = -10, _yMax = 10;
   String _error = '';
   bool _loading = false;
   bool _autoDomain = true;
   bool _fractionMode = false;
   bool _desmosLight = true;
-  bool _piLabels = true;
+  bool _piLabels = false;
   double _a = 1, _b = 0, _c = 0;
   bool _showSliders = false;
   double? _traceX, _traceY;
@@ -58,12 +57,12 @@ class _GraphScreenState extends State<GraphScreen>
   final GlobalKey _chartKey = GlobalKey();
 
   static const _examples = [
+    'x^3-3*x',
     'sin(x)',
     'cos(x)',
     'a*x^2+b*x+c',
     'ln(2x+1)',
     '(2x+1)/(x-3)',
-    '(2x+1)/ln(x-e)',
   ];
   int _exampleIndex = 0;
 
@@ -177,7 +176,6 @@ class _GraphScreenState extends State<GraphScreen>
 
     try {
       _detectSliders(exprs.join('+'));
-
       if (_autoDomain) {
         final w = _engine.suggestWindow(exprs.first);
         _xMin = w.xMin;
@@ -190,7 +188,6 @@ class _GraphScreenState extends State<GraphScreen>
       var ymin = double.infinity;
       var ymax = -double.infinity;
       final allSegs = <List<List<MapEntry<double, double>>>>[];
-
       for (final expr in exprs) {
         final segs =
             _graphService.evaluateSegments(expr, _xMin, _xMax, 1000);
@@ -203,7 +200,6 @@ class _GraphScreenState extends State<GraphScreen>
         }
       }
 
-      // Non-trig : orthonorme + auto Y
       if (!_piLabels) {
         if (!ymin.isFinite) {
           ymin = -5;
@@ -229,7 +225,6 @@ class _GraphScreenState extends State<GraphScreen>
         _yMin = yMid - span / 2;
         _yMax = yMid + span / 2;
       }
-      // Trig : garde [-2π,2π] × [-2,2]
 
       final allSegs2 = <List<List<MapEntry<double, double>>>>[];
       for (final expr in exprs) {
@@ -294,6 +289,11 @@ class _GraphScreenState extends State<GraphScreen>
           pw.Text('f(x) = ${_study!.expression}'),
           pw.Text(_study!.domain),
           pw.Text("f' = ${_study!.derivative}"),
+          pw.Text("f'' = ${_study!.secondDerivative}"),
+          pw.Text('Racines:\n${_study!.roots.join('\n')}'),
+          pw.Text('Extrema:\n${_study!.extrema.join('\n')}'),
+          pw.Text('Inflexions:\n${_study!.inflections.join('\n')}'),
+          pw.Text(_study!.variationTable),
           pw.Text(_study!.explanations),
         ],
       ));
@@ -365,7 +365,7 @@ class _GraphScreenState extends State<GraphScreen>
                           child: TextField(
                             controller: _exprCtrls[i],
                             decoration: InputDecoration(
-                              hintText: 'sin(x)  ou  a*x^2+b*x+c',
+                              hintText: 'x^3-3*x  ou  sin(x)',
                               isDense: true,
                               border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10)),
@@ -419,33 +419,6 @@ class _GraphScreenState extends State<GraphScreen>
                 ],
               ),
             ),
-          if (_fractionMode)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _numController,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w600),
-                    decoration: const InputDecoration(
-                        hintText: 'numerateur', border: InputBorder.none),
-                  ),
-                  Container(height: 2.5, color: _desmosColors[0]),
-                  TextField(
-                    controller: _denController,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w600),
-                    decoration: const InputDecoration(
-                        hintText: 'denominateur', border: InputBorder.none),
-                  ),
-                  FilledButton(
-                      onPressed: _analyze, child: const Text('Analyser')),
-                ],
-              ),
-            ),
           if (_showSliders)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -479,11 +452,6 @@ class _GraphScreenState extends State<GraphScreen>
                         final half = (_xMax - _xMin) / 2 * 1.4;
                         _xMin = mid - half;
                         _xMax = mid + half;
-                        if (!_piLabels) {
-                          final midY = (_yMin + _yMax) / 2;
-                          _yMin = midY - half;
-                          _yMax = midY + half;
-                        }
                       });
                       _analyze();
                     },
@@ -510,13 +478,6 @@ class _GraphScreenState extends State<GraphScreen>
                         final half = (_xMax - _xMin) / 4;
                         _xMin = mid - half;
                         _xMax = mid + half;
-                        if (!_piLabels) {
-                          final midY = (_yMin + _yMax) / 2;
-                          _yMin = midY - half;
-                          _yMax = midY + half;
-                        } else {
-                          // trig: zoom X only, keep Y ~[-2,2]
-                        }
                       });
                       _analyze();
                     },
@@ -529,8 +490,8 @@ class _GraphScreenState extends State<GraphScreen>
           if (_traceX != null)
             Text(
               _traceY != null
-                  ? 'x ≈ ${_fmtTrace(_traceX!)}   y ≈ ${_fmtTrace(_traceY!)}'
-                  : 'x ≈ ${_fmtTrace(_traceX!)}  (hors domaine)',
+                  ? 'x ≈ ${_traceX!.toStringAsFixed(3)}  y ≈ ${_traceY!.toStringAsFixed(3)}'
+                  : 'hors domaine',
               style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).primaryColor),
@@ -540,10 +501,7 @@ class _GraphScreenState extends State<GraphScreen>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                _buildChart(),
-                _buildStudy(),
-              ],
+              children: [_buildChart(), _buildStudy()],
             ),
           ),
         ],
@@ -564,35 +522,11 @@ class _GraphScreenState extends State<GraphScreen>
             min: -5,
             max: 5,
             divisions: 100,
-            label: value.toStringAsFixed(2),
             onChanged: onChanged,
           ),
         ),
-        SizedBox(
-            width: 40,
-            child: Text(value.toStringAsFixed(2),
-                style: const TextStyle(fontSize: 12))),
       ],
     );
-  }
-
-  String _fmtTrace(double v) {
-    if (_piLabels && (v / (math.pi / 2)).round().abs() <= 8) {
-      final k = (v / (math.pi / 2)).round();
-      if ((v - k * math.pi / 2).abs() < 0.05) {
-        if (k == 0) return '0';
-        final s = k < 0 ? '-' : '';
-        final a = k.abs();
-        if (a % 2 == 0) {
-          final n = a ~/ 2;
-          return n == 1 ? '${s}π' : '$s$nπ';
-        }
-        return a == 1 ? '${s}π/2' : '$s$aπ/2';
-      }
-    }
-    if (v.abs() < 1e-9) return '0';
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(3);
   }
 
   Widget _buildChart() {
@@ -620,6 +554,7 @@ class _GraphScreenState extends State<GraphScreen>
                 traceX: _traceX,
                 traceY: _traceY,
                 piLabels: _piLabels,
+                remarkable: _study?.remarkablePoints ?? const [],
               ),
               child: const SizedBox.expand(),
             ),
@@ -638,13 +573,18 @@ class _GraphScreenState extends State<GraphScreen>
       children: [
         _card('Fonction', 'f(x) = ${_study!.expression}'),
         _card('Domaine', _study!.domain),
-        _card('Derivee', "f'(x) = ${_study!.derivative}"),
-        _card('Limites', _study!.limits),
-        _card('Extremums', _study!.extrema.join('\n')),
+        _card("f'(x)", _study!.derivative),
+        _card("f''(x)", _study!.secondDerivative),
+        _card('Racines (f=0)', _study!.roots.join('\n')),
+        _card("Ordonnee a l'origine", _study!.intercepts.join('\n')),
+        _card("Extrema (f'=0)", _study!.extrema.join('\n')),
+        _card("Points d'inflexion (f''=0)", _study!.inflections.join('\n')),
         _card('Asymptotes', _study!.asymptotes.join('\n')),
+        _card('Limites et images', _study!.limits),
+        _card('Tableau de variation (epure)', _study!.variationTable),
         _card('Symetrie', _study!.symmetry),
-        _card('Variation', _study!.variationTable),
-        _card('Explications', _study!.explanations),
+        _card('Periodicite', _study!.period),
+        _card('Methode', _study!.explanations),
       ],
     );
   }
@@ -674,6 +614,7 @@ class _DesmosPainter extends CustomPainter {
   final List<Color> colors;
   final double? traceX, traceY;
   final bool piLabels;
+  final List<MapEntry<double, double>> remarkable;
 
   _DesmosPainter({
     required this.allSegments,
@@ -686,6 +627,7 @@ class _DesmosPainter extends CustomPainter {
     this.traceX,
     this.traceY,
     this.piLabels = false,
+    this.remarkable = const [],
   });
 
   @override
@@ -787,6 +729,23 @@ class _DesmosPainter extends CustomPainter {
         }
         canvas.drawPath(path, curve);
       }
+    }
+
+    // Points remarquables (extrema / inflexions)
+    for (final p in remarkable) {
+      if (p.key < xMin || p.key > xMax) continue;
+      if (p.value < yMin || p.value > yMax) continue;
+      final px = toPx(p.key);
+      final py = toPy(p.value);
+      canvas.drawCircle(Offset(px, py), 6, Paint()..color = colors[1]);
+      canvas.drawCircle(
+        Offset(px, py),
+        6,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
     }
 
     if (traceX != null && traceY != null) {

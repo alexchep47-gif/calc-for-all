@@ -55,7 +55,6 @@ class _GraphScreenState extends State<GraphScreen>
   double? _traceX, _traceY;
   late TabController _tabController;
   final GlobalKey _chartKey = GlobalKey();
-  final GlobalKey _studyKey = GlobalKey();
 
   static const _examples = [
     'sin(x)',
@@ -65,7 +64,11 @@ class _GraphScreenState extends State<GraphScreen>
     'ln(2x+1)',
     '(2x+1)/(x-3)',
     'sqrt(x)',
+    'x^(1/3)',
+    'x^2',
     '1/x',
+    'exp(x)',
+    'abs(x)',
   ];
   int _exampleIndex = 0;
 
@@ -250,7 +253,7 @@ class _GraphScreenState extends State<GraphScreen>
   }
 
   String _fmtTraceX(double v) {
-    if (!_piLabels) return _fmtDec(v);
+    if (!_piLabels) return MathLibrary.format(v);
     final tol = (_xMax - _xMin) / 80;
     String? best;
     var bestDist = tol;
@@ -264,7 +267,7 @@ class _GraphScreenState extends State<GraphScreen>
         best = _piFractionLabel(k, den);
       }
     }
-    return best ?? _fmtDec(v);
+    return best ?? MathLibrary.format(v);
   }
 
   String _fmtTraceY(double v) {
@@ -282,7 +285,7 @@ class _GraphScreenState extends State<GraphScreen>
         if ((v - vals[i]).abs() < 0.04) return labs[i];
       }
     }
-    return _fmtDec(v);
+    return MathLibrary.format(v);
   }
 
   String _piFractionLabel(int k, int den) {
@@ -295,12 +298,6 @@ class _GraphScreenState extends State<GraphScreen>
     if (d == 1) return n == 1 ? '${sign}π' : '$sign$nπ';
     if (n == 1) return '${sign}π/$d';
     return '$sign$nπ/$d';
-  }
-
-  String _fmtDec(double v) {
-    if (v.abs() < 1e-9) return '0';
-    if ((v - v.roundToDouble()).abs() < 1e-6) return v.round().toString();
-    return v.toStringAsFixed(3);
   }
 
   double _snapPi(double x) {
@@ -349,33 +346,42 @@ class _GraphScreenState extends State<GraphScreen>
       return;
     }
     try {
-      final regular =
-          pw.Font.ttf(await rootBundle.load('assets/DejaVuSans.ttf'));
-      final bold =
-          pw.Font.ttf(await rootBundle.load('assets/DejaVuSans-Bold.ttf'));
+      pw.Font regular;
+      pw.Font bold;
+      try {
+        regular = pw.Font.ttf(await rootBundle.load('assets/DejaVuSans.ttf'));
+        bold = pw.Font.ttf(await rootBundle.load('assets/DejaVuSans-Bold.ttf'));
+      } catch (_) {
+        regular = pw.Font.helvetica();
+        bold = pw.Font.helveticaBold();
+      }
       final pdf = pw.Document();
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         theme: pw.ThemeData.withFont(base: regular, bold: bold),
         build: (_) => [
-          pw.Text('Etude de fonction - Calc For All',
+          pw.Text('Étude de fonction — Calc For All',
               style: pw.TextStyle(font: bold, fontSize: 18)),
           pw.SizedBox(height: 12),
           pw.Text(MathPretty.functionLine(_study!.expression),
               style: pw.TextStyle(font: bold, fontSize: 14)),
-          pw.Text(_study!.domain),
-          pw.Text(MathPretty.derivativeLine(_study!.derivative)),
-          pw.Text('f\'\'(x) = ${MathPretty.format(_study!.secondDerivative)}'),
+          pw.Text('Domaine : ${_study!.domain}'),
+          pw.Text("f'(x) = ${MathPretty.format(_study!.derivative)}"),
+          pw.Text("f''(x) = ${MathPretty.format(_study!.secondDerivative)}"),
           pw.SizedBox(height: 8),
-          pw.Text('Racines:', style: pw.TextStyle(font: bold)),
+          pw.Text('Racines :', style: pw.TextStyle(font: bold)),
           ..._study!.roots.map((e) => pw.Text(e)),
-          pw.Text('Extrema:', style: pw.TextStyle(font: bold)),
+          pw.Text('Extrema :', style: pw.TextStyle(font: bold)),
           ..._study!.extrema.map((e) => pw.Text(e)),
-          pw.Text('Asymptotes:', style: pw.TextStyle(font: bold)),
+          pw.Text("Points d'inflexion :", style: pw.TextStyle(font: bold)),
+          ..._study!.inflections.map((e) => pw.Text(e)),
+          pw.Text('Asymptotes :', style: pw.TextStyle(font: bold)),
           ..._study!.asymptotes.map((e) => pw.Text(e)),
           pw.SizedBox(height: 8),
+          pw.Text('Tableau de variation', style: pw.TextStyle(font: bold)),
           pw.Text(_study!.variationTable),
           pw.SizedBox(height: 8),
+          pw.Text('Symétrie : ${_study!.symmetry}'),
           pw.Text(_study!.explanations),
         ],
       ));
@@ -429,7 +435,7 @@ class _GraphScreenState extends State<GraphScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [Tab(text: 'Graphique'), Tab(text: 'Etude')],
+          tabs: const [Tab(text: 'Graphique'), Tab(text: 'Étude')],
         ),
       ),
       body: Column(
@@ -467,7 +473,7 @@ class _GraphScreenState extends State<GraphScreen>
                         child: TextField(
                           controller: _exprCtrls[i],
                           decoration: InputDecoration(
-                            hintText: 'sin(x)  ou  ln(x)',
+                            hintText: 'sin(x), sqrt(x), x^(1/3)…',
                             isDense: true,
                             border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10)),
@@ -678,11 +684,11 @@ class _GraphScreenState extends State<GraphScreen>
       children: [
         _card('Fonction', MathPretty.functionLine(_study!.expression)),
         _card('Domaine', _study!.domain),
-        _card('f′(x)', MathPretty.format(_study!.derivative)),
-        _card('f″(x)', MathPretty.format(_study!.secondDerivative)),
+        _card("f'(x)", MathPretty.format(_study!.derivative)),
+        _card("f''(x)", MathPretty.format(_study!.secondDerivative)),
         _card('Racines (f = 0)', _study!.roots.join('\n')),
         _card("Ordonnée à l'origine", _study!.intercepts.join('\n')),
-        _card("Extrema (f′ = 0)", _study!.extrema.join('\n')),
+        _card("Extrema (f' = 0)", _study!.extrema.join('\n')),
         _card("Points d'inflexion", _study!.inflections.join('\n')),
         _card('Asymptotes', _study!.asymptotes.join('\n')),
         _card('Limites', _study!.limits),
@@ -831,7 +837,7 @@ class _DesmosPainter extends CustomPainter {
     for (var x = _floor(xMin, stepMajor); x <= xMax + 1e-9; x += stepMajor) {
       if (x.abs() < stepMajor * 0.01) continue;
       final px = toPx(x);
-      final label = piLabels ? _fmtPi(x) : _fmt(x);
+      final label = piLabels ? _fmtPi(x) : MathLibrary.format(x);
       tp.text = TextSpan(
           text: label, style: TextStyle(color: labelColor, fontSize: 10));
       tp.layout();
@@ -841,7 +847,8 @@ class _DesmosPainter extends CustomPainter {
       if (y.abs() < stepMajor * 0.01) continue;
       final py = toPy(y);
       tp.text = TextSpan(
-          text: _fmt(y), style: TextStyle(color: labelColor, fontSize: 10));
+          text: MathLibrary.format(y),
+          style: TextStyle(color: labelColor, fontSize: 10));
       tp.layout();
       tp.paint(canvas, Offset(ox - tp.width - 6, py - tp.height / 2));
     }
@@ -868,12 +875,21 @@ class _DesmosPainter extends CustomPainter {
       }
     }
 
+    // Points critiques uniquement (rouge)
     for (final p in remarkable) {
       if (p.key < xMin || p.key > xMax) continue;
       if (p.value < yMin || p.value > yMax) continue;
       final px = toPx(p.key);
       final py = toPy(p.value);
-      canvas.drawCircle(Offset(px, py), 6, Paint()..color = colors[1]);
+      canvas.drawCircle(Offset(px, py), 6, Paint()..color = const Color(0xFFC74440));
+      canvas.drawCircle(
+        Offset(px, py),
+        6,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
     }
 
     if (traceX != null && traceY != null) {
@@ -900,7 +916,7 @@ class _DesmosPainter extends CustomPainter {
   String _fmtPi(double v) {
     final half = math.pi / 2;
     final k = (v / half).round();
-    if ((v - k * half).abs() > 0.08) return _fmt(v);
+    if ((v - k * half).abs() > 0.08) return MathLibrary.format(v);
     if (k == 0) return '0';
     final sign = k < 0 ? '-' : '';
     final a = k.abs();
@@ -909,12 +925,6 @@ class _DesmosPainter extends CustomPainter {
       return n == 1 ? '${sign}π' : '$sign$nπ';
     }
     return a == 1 ? '${sign}π/2' : '$sign$aπ/2';
-  }
-
-  String _fmt(double v) {
-    if (v.abs() < 1e-9) return '0';
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(1);
   }
 
   double _niceStep(double rough) {

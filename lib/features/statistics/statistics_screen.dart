@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
+import '../../data/services/math_library.dart';
 
 /// Module Statistiques : saisie d’une série et calcul des indicateurs
 class StatisticsScreen extends StatefulWidget {
@@ -67,23 +68,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final range = maxV - minV;
 
     final buffer = StringBuffer();
-    buffer.writeln('Données triées : ${values.map((e) => e.toStringAsFixed(2)).join(', ')}');
+    buffer.writeln(
+        'Données triées : ${values.map(MathLibrary.format).join(', ')}');
     buffer.writeln('Effectif n = $n');
     buffer.writeln();
     buffer.writeln('1. Somme = $sum');
-    buffer.writeln('2. Moyenne (x̄) = somme / n = $sum / $n = ${mean.toStringAsFixed(4)}');
-    buffer.writeln('3. Médiane = ${median.toStringAsFixed(4)}');
-    buffer.writeln('4. Minimum = $minV');
-    buffer.writeln('5. Maximum = $maxV');
-    buffer.writeln('6. Étendue = max − min = $range');
-    buffer.writeln('7. Variance = ${variance.toStringAsFixed(4)}');
-    buffer.writeln('8. Écart-type (σ) = √variance = ${std.toStringAsFixed(4)}');
+    buffer.writeln(
+        '2. Moyenne (x̄) = somme / n = $sum / $n = ${MathLibrary.format(mean)}');
+    buffer.writeln('3. Médiane = ${MathLibrary.format(median)}');
+    buffer.writeln('4. Minimum = ${MathLibrary.format(minV)}');
+    buffer.writeln('5. Maximum = ${MathLibrary.format(maxV)}');
+    buffer.writeln('6. Étendue = max − min = ${MathLibrary.format(range)}');
+    buffer.writeln('7. Variance = ${MathLibrary.format(variance)}');
+    buffer
+        .writeln('8. Écart-type (σ) = √variance = ${MathLibrary.format(std)}');
 
     setState(() {
-      _result = 'Moyenne : ${mean.toStringAsFixed(4)}\n'
-          'Médiane : ${median.toStringAsFixed(4)}\n'
-          'Écart-type : ${std.toStringAsFixed(4)}\n'
-          'Min : $minV  |  Max : $maxV';
+      _result = 'Moyenne : ${MathLibrary.format(mean)}\n'
+          'Médiane : ${MathLibrary.format(median)}\n'
+          'Écart-type : ${MathLibrary.format(std)}\n'
+          'Min : ${MathLibrary.format(minV)}  |  Max : ${MathLibrary.format(maxV)}';
       _steps = buffer.toString();
     });
   }
@@ -105,7 +109,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Ex: 12 15 18 20 22 25 30',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 20),
@@ -113,30 +118,38 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             onPressed: _calculate,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Text('Calculer les statistiques', style: TextStyle(fontSize: 16)),
+            child: const Text('Calculer les statistiques',
+                style: TextStyle(fontSize: 16)),
           ),
           if (_result.isNotEmpty) ...[
             const SizedBox(height: 24),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(18),
-                child: Text(_result, style: const TextStyle(fontSize: 16, height: 1.5)),
+                child: Text(_result,
+                    style: const TextStyle(fontSize: 16, height: 1.5)),
               ),
             ).animate().fadeIn().scale(),
             const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Détail des calculs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Détail des calculs',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
-                    Text(_steps, style: const TextStyle(height: 1.45, fontSize: 13)),
+                    Text(_steps,
+                        style: const TextStyle(height: 1.45, fontSize: 13)),
                   ],
                 ),
               ),

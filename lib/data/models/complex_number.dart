@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../services/math_library.dart';
 
 /// Représentation d'un nombre complexe (a + bi)
 class ComplexNumber {
@@ -79,8 +80,7 @@ class ComplexNumber {
   }
 
   String _format(double v) {
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(6).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+    return MathLibrary.format(v);
   }
 
   /// Forme polaire : (module, argument en degrés)

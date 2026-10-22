@@ -602,11 +602,6 @@ f''(x) = $secondDeriv
     if ((value - (MathLibrary.e + 1)).abs() < 0.01) return 'e+1';
     if ((value - math.pi).abs() < 0.01) return 'π';
     if ((value + math.pi).abs() < 0.01) return '-π';
-    var s = value.toStringAsFixed(3);
-    while (s.endsWith('0')) {
-      s = s.substring(0, s.length - 1);
-    }
-    if (s.endsWith('.')) s = s.substring(0, s.length - 1);
-    return s;
+    return MathLibrary.format(value);
   }
 }

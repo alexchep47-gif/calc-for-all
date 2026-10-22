@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
+import '../../data/services/math_library.dart';
 
 /// Probabilités : combinatoire + lois binomiale et normale
 class ProbabilityScreen extends StatefulWidget {
@@ -15,12 +16,14 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
   final TextEditingController _kController = TextEditingController();
   final TextEditingController _pController = TextEditingController(text: '0.5');
   final TextEditingController _muController = TextEditingController(text: '0');
-  final TextEditingController _sigmaController = TextEditingController(text: '1');
+  final TextEditingController _sigmaController =
+      TextEditingController(text: '1');
   final TextEditingController _xController = TextEditingController(text: '0');
 
   String _result = '';
   String _steps = '';
-  String _mode = 'combinaison'; // combinaison, arrangement, permutation, binomiale, normale
+  String _mode =
+      'combinaison'; // combinaison, arrangement, permutation, binomiale, normale
 
   int? _parseInt(String s) => int.tryParse(s.trim());
   double? _parseDouble(String s) =>
@@ -83,9 +86,7 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
     final p = d *
         t *
         (0.3193815 +
-            t *
-                (-0.3565638 +
-                    t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+            t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
     return z >= 0 ? 1 - p : p;
   }
 
@@ -96,8 +97,14 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
       final n = _parseInt(_nController.text);
       final k = _parseInt(_kController.text);
       final p = _parseDouble(_pController.text);
-      if (n == null || k == null || p == null || n < 0 || k < 0 || k > n ||
-          p < 0 || p > 1) {
+      if (n == null ||
+          k == null ||
+          p == null ||
+          n < 0 ||
+          k < 0 ||
+          k > n ||
+          p < 0 ||
+          p > 1) {
         setState(() {
           _result = 'Paramètres invalides';
           _steps = 'n ≥ k ≥ 0 et 0 ≤ p ≤ 1';
@@ -110,9 +117,9 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
       buffer.writeln('P(X = k) = C(n,k) × p^k × (1-p)^(n-k)');
       buffer.writeln('n = $n, k = $k, p = $p');
       buffer.writeln('C($n,$k) = $c');
-      buffer.writeln('P(X = $k) ≈ ${prob.toStringAsFixed(8)}');
+      buffer.writeln('P(X = $k) = ${MathLibrary.format(prob)}');
       setState(() {
-        _result = prob.toStringAsFixed(8);
+        _result = MathLibrary.format(prob);
         _steps = buffer.toString();
       });
       return;
@@ -136,11 +143,11 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
       buffer.writeln('Loi normale N(μ, σ²)');
       buffer.writeln('μ = $mu, σ = $sigma, x = $x');
       buffer.writeln('z = (x − μ) / σ = $z');
-      buffer.writeln('Densité f(x) ≈ ${density.toStringAsFixed(8)}');
-      buffer.writeln('P(X ≤ x) = Φ(z) ≈ ${cdf.toStringAsFixed(8)}');
+      buffer.writeln('Densité f(x) = ${MathLibrary.format(density)}');
+      buffer.writeln('P(X ≤ x) = Φ(z) = ${MathLibrary.format(cdf)}');
       setState(() {
         _result =
-            'f(x) ≈ ${density.toStringAsFixed(6)}\nP(X≤x) ≈ ${cdf.toStringAsFixed(6)}';
+            'f(x) = ${MathLibrary.format(density)}\nP(X≤x) = ${MathLibrary.format(cdf)}';
         _steps = buffer.toString();
       });
       return;
@@ -229,12 +236,11 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
             ),
           ).animate().fadeIn(),
           const SizedBox(height: 20),
-
           if (_mode == 'normale') ...[
             TextField(
               controller: _muController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true, signed: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true, signed: true),
               decoration: InputDecoration(
                 labelText: 'μ (moyenne)',
                 border:
@@ -255,8 +261,8 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _xController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true, signed: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true, signed: true),
               decoration: InputDecoration(
                 labelText: 'x',
                 border:
@@ -279,8 +285,7 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
                 controller: _kController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText:
-                      _mode == 'binomiale' ? 'k (succès)' : 'k',
+                  labelText: _mode == 'binomiale' ? 'k (succès)' : 'k',
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
@@ -300,7 +305,6 @@ class _ProbabilityScreenState extends State<ProbabilityScreen> {
               ),
             ],
           ],
-
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _calculate,

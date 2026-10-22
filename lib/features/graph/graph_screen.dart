@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -52,8 +53,10 @@ class _GraphScreenState extends State<GraphScreen>
   double _a = 1, _b = 0, _c = 0;
   bool _showSliders = false;
   double? _traceX, _traceY;
+  double _gestureXMin = 0, _gestureXMax = 0, _gestureYMin = 0, _gestureYMax = 0;
   late TabController _tabController;
   final GlobalKey _chartKey = GlobalKey();
+  final GlobalKey _studyKey = GlobalKey();
 
   static const _examples = [
     'sin(x)',
@@ -162,8 +165,7 @@ class _GraphScreenState extends State<GraphScreen>
         _yMax = w.yMax;
         _piLabels = w.piLabels;
         // Restreindre strictement au domaine reel
-        final clamped =
-            _graphService.clampToDomain(exprs.first, _xMin, _xMax);
+        final clamped = _graphService.clampToDomain(exprs.first, _xMin, _xMax);
         _xMin = clamped.xMin;
         _xMax = clamped.xMax;
       }
@@ -178,7 +180,7 @@ class _GraphScreenState extends State<GraphScreen>
           }
         }
       }
-      if (!_piLabels) {
+      if (!_piLabels && _autoDomain) {
         if (!ymin.isFinite) {
           ymin = -5;
           ymax = 5;
@@ -203,8 +205,7 @@ class _GraphScreenState extends State<GraphScreen>
         _yMin = yMid - span / 2;
         _yMax = yMid + span / 2;
         // Re-clamp apres orthonorme pour ne pas reintroduire hors domaine
-        final clamped2 =
-            _graphService.clampToDomain(exprs.first, _xMin, _xMax);
+        final clamped2 = _graphService.clampToDomain(exprs.first, _xMin, _xMax);
         // Garder orthonorme mais ne tracer que dans domaine : X peut etre plus large,
         // les segments ignoreront hors domaine
         _xMin = math.min(_xMin, clamped2.xMin);
@@ -212,8 +213,7 @@ class _GraphScreenState extends State<GraphScreen>
       }
       final allSegs2 = <List<List<MapEntry<double, double>>>>[];
       for (final expr in exprs) {
-        allSegs2.add(
-            _graphService.evaluateSegments(expr, _xMin, _xMax, 1200));
+        allSegs2.add(_graphService.evaluateSegments(expr, _xMin, _xMax, 1200));
       }
       final study =
           _analysisService.analyze(exprs.first, xMin: _xMin, xMax: _xMax);
@@ -276,13 +276,26 @@ class _GraphScreenState extends State<GraphScreen>
   String _fmtTraceY(double v) {
     if (_piLabels) {
       final vals = <double>[
-        0, 1, -1, 0.5, -0.5,
-        math.sqrt(2) / 2, -math.sqrt(2) / 2,
-        math.sqrt(3) / 2, -math.sqrt(3) / 2,
+        0,
+        1,
+        -1,
+        0.5,
+        -0.5,
+        math.sqrt(2) / 2,
+        -math.sqrt(2) / 2,
+        math.sqrt(3) / 2,
+        -math.sqrt(3) / 2,
       ];
       final labs = <String>[
-        '0', '1', '-1', '1/2', '-1/2',
-        '√2/2', '-√2/2', '√3/2', '-√3/2',
+        '0',
+        '1',
+        '-1',
+        '1/2',
+        '-1/2',
+        '√2/2',
+        '-√2/2',
+        '√3/2',
+        '-√3/2',
       ];
       for (var i = 0; i < vals.length; i++) {
         if ((v - vals[i]).abs() < 0.04) return labs[i];
@@ -304,9 +317,7 @@ class _GraphScreenState extends State<GraphScreen>
   }
 
   String _fmtDec(double v) {
-    if (v.abs() < 1e-9) return '0';
-    if ((v - v.roundToDouble()).abs() < 1e-6) return v.round().toString();
-    return v.toStringAsFixed(3);
+    return MathLibrary.format(v);
   }
 
   double _snapPi(double x) {
@@ -327,6 +338,118 @@ class _GraphScreenState extends State<GraphScreen>
     return best;
   }
 
+  void _zoomFromGesture(double scale) {
+    if (!scale.isFinite || scale <= 0) return;
+    final factor = (1 / scale).clamp(0.2, 5.0);
+    final xCenter = (_gestureXMin + _gestureXMax) / 2;
+    final yCenter = (_gestureYMin + _gestureYMax) / 2;
+    setState(() {
+      _autoDomain = false;
+      final xHalf = (_gestureXMax - _gestureXMin) * factor / 2;
+      final yHalf = (_gestureYMax - _gestureYMin) * factor / 2;
+      _xMin = xCenter - xHalf;
+      _xMax = xCenter + xHalf;
+      _yMin = yCenter - yHalf;
+      _yMax = yCenter + yHalf;
+    });
+    _analyze();
+  }
+
+  Future<ui.Image?> _captureChart() async {
+    final key = _tabController.index == 1 ? _studyKey : _chartKey;
+    final boundary =
+        key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) return null;
+    return boundary.toImage(pixelRatio: 3.0);
+  }
+
+  Future<Uint8List> _pngWithWatermark(ui.Image image) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawImage(image, Offset.zero, Paint());
+    canvas.save();
+    canvas.translate(image.width / 2, image.height / 2);
+    canvas.rotate(-math.pi / 4);
+    final painter = TextPainter(
+      text: const TextSpan(
+          text: 'Calc For All',
+          style: TextStyle(
+              color: Color(0x55333333),
+              fontSize: 52,
+              fontWeight: FontWeight.bold)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    for (var y = -image.height; y < image.height; y += 150) {
+      for (var x = -image.width; x < image.width; x += 360) {
+        painter.paint(canvas, Offset(x.toDouble(), y.toDouble()));
+      }
+    }
+    canvas.restore();
+    final result =
+        await recorder.endRecording().toImage(image.width, image.height);
+    final bytes = await result.toByteData(format: ui.ImageByteFormat.png);
+    return bytes!.buffer.asUint8List();
+  }
+
+  Future<void> _exportImage() async {
+    final image = await _captureChart();
+    if (image == null) return;
+    final bytes = await _pngWithWatermark(image);
+    await Share.shareXFiles([
+      XFile.fromData(bytes,
+          mimeType: 'image/png', name: 'calc-for-all-graph.png')
+    ]);
+  }
+
+  Future<void> _exportPdf() async {
+    final image = await _captureChart();
+    if (image == null) return;
+    final png = await _pngWithWatermark(image);
+    final document = pw.Document();
+    final graphImage = pw.MemoryImage(png);
+    document.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      build: (context) => pw.Stack(children: [
+        pw.Positioned.fill(
+          child: pw.Center(
+            child: pw.Transform.rotate(
+              angle: -math.pi / 4,
+              child: pw.Opacity(
+                opacity: .08,
+                child: pw.Text(
+                  'Calc For All',
+                  style: pw.TextStyle(fontSize: 48.0, color: PdfColors.grey),
+                ),
+              ),
+            ),
+          ),
+        ),
+        pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Text('Calc For All',
+              style:
+                  pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 8),
+          pw.Text('Fonction : ${_primaryExpr}'),
+          pw.SizedBox(height: 12),
+          pw.Image(graphImage, fit: pw.BoxFit.contain),
+          if (_study != null) ...[
+            pw.SizedBox(height: 12),
+            pw.Text('Étude de fonction',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Domaine : ${_study!.domain}'),
+            pw.Text('Dérivée : ${_study!.derivative}'),
+            pw.Text('Limites : ${_study!.limits}'),
+            pw.Text('Asymptotes : ${_study!.asymptotes.join(' ; ')}'),
+            pw.Text('Variation : ${_study!.variationTable}'),
+          ],
+        ]),
+      ]),
+    ));
+    await Printing.sharePdf(
+        bytes: await document.save(), filename: 'calc-for-all-etude.pdf');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -336,6 +459,16 @@ class _GraphScreenState extends State<GraphScreen>
           IconButton(
             icon: Icon(_desmosLight ? Icons.dark_mode : Icons.light_mode),
             onPressed: () => setState(() => _desmosLight = !_desmosLight),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Exporter',
+            icon: const Icon(Icons.ios_share_rounded),
+            onSelected: (value) =>
+                value == 'png' ? _exportImage() : _exportPdf(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'png', child: Text('Exporter en image PNG')),
+              PopupMenuItem(value: 'pdf', child: Text('Exporter en PDF')),
+            ],
           ),
           TextButton(onPressed: _loadExample, child: const Text('Exemple')),
         ],
@@ -367,8 +500,7 @@ class _GraphScreenState extends State<GraphScreen>
                           width: 18,
                           height: 18,
                           decoration: BoxDecoration(
-                            color:
-                                _exprVisible[i] ? color : Colors.transparent,
+                            color: _exprVisible[i] ? color : Colors.transparent,
                             border: Border.all(color: color, width: 2),
                             shape: BoxShape.circle,
                           ),
@@ -557,6 +689,19 @@ class _GraphScreenState extends State<GraphScreen>
         child: LayoutBuilder(builder: (context, c) {
           final size = Size(c.maxWidth, c.maxHeight);
           return GestureDetector(
+            onScaleStart: (_) => setState(() {
+              _gestureXMin = _xMin;
+              _gestureXMax = _xMax;
+              _gestureYMin = _yMin;
+              _gestureYMax = _yMax;
+            }),
+            onScaleUpdate: (d) {
+              if ((d.scale - 1).abs() > 0.01) {
+                _zoomFromGesture(d.scale);
+              } else {
+                _onTrace(d.localFocalPoint, size);
+              }
+            },
             onPanUpdate: (d) => _onTrace(d.localPosition, size),
             onTapDown: (d) => _onTrace(d.localPosition, size),
             child: CustomPaint(
@@ -585,23 +730,26 @@ class _GraphScreenState extends State<GraphScreen>
     if (_study == null) {
       return const Center(child: Text('Analyse une fonction'));
     }
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _card('Fonction', MathPretty.functionLine(_study!.expression)),
-        _card('Domaine', _study!.domain),
-        _card('f′(x)', MathPretty.format(_study!.derivative)),
-        _card('f″(x)', MathPretty.format(_study!.secondDerivative)),
-        _card('Racines (f=0)', _study!.roots.join('\n')),
-        _card("Ordonnee a l'origine", _study!.intercepts.join('\n')),
-        _card("Extrema (f'=0)", _study!.extrema.join('\n')),
-        _card("Points d'inflexion", _study!.inflections.join('\n')),
-        _card('Asymptotes', _study!.asymptotes.join('\n')),
-        _card('Limites', _study!.limits),
-        _card('Tableau de variation', _study!.variationTable),
-        _card('Symetrie', _study!.symmetry),
-        _card('Methode', _study!.explanations),
-      ],
+    return RepaintBoundary(
+      key: _studyKey,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _card('Fonction', MathPretty.functionLine(_study!.expression)),
+          _card('Domaine', _study!.domain),
+          _card('f′(x)', MathPretty.format(_study!.derivative)),
+          _card('f″(x)', MathPretty.format(_study!.secondDerivative)),
+          _card('Racines (f=0)', _study!.roots.join('\n')),
+          _card("Ordonnee a l'origine", _study!.intercepts.join('\n')),
+          _card("Extrema (f'=0)", _study!.extrema.join('\n')),
+          _card("Points d'inflexion", _study!.inflections.join('\n')),
+          _card('Asymptotes', _study!.asymptotes.join('\n')),
+          _card('Limites', _study!.limits),
+          _card('Tableau de variation', _study!.variationTable),
+          _card('Symetrie', _study!.symmetry),
+          _card('Methode', _study!.explanations),
+        ],
+      ),
     );
   }
 
@@ -676,7 +824,8 @@ class _DesmosPainter extends CustomPainter {
         Rect.fromLTWH(0, 0, size.width, size.height),
         const Radius.circular(12),
       ),
-      Paint()..color = light ? const Color(0xFFF7F7F7) : const Color(0xFF0B1220),
+      Paint()
+        ..color = light ? const Color(0xFFF7F7F7) : const Color(0xFF0B1220),
     );
 
     final minor = Paint()
@@ -708,12 +857,10 @@ class _DesmosPainter extends CustomPainter {
           _mult(y, stepMajor) ? major : minor);
     }
     if (xMin <= 0 && xMax >= 0) {
-      canvas.drawLine(
-          Offset(toPx(0), oy), Offset(toPx(0), oy + usedH), axis);
+      canvas.drawLine(Offset(toPx(0), oy), Offset(toPx(0), oy + usedH), axis);
     }
     if (yMin <= 0 && yMax >= 0) {
-      canvas.drawLine(
-          Offset(ox, toPy(0)), Offset(ox + usedW, toPy(0)), axis);
+      canvas.drawLine(Offset(ox, toPy(0)), Offset(ox + usedW, toPy(0)), axis);
     }
 
     final tp = TextPainter(textDirection: TextDirection.ltr);
@@ -810,9 +957,7 @@ class _DesmosPainter extends CustomPainter {
   }
 
   String _fmt(double v) {
-    if (v.abs() < 1e-9) return '0';
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(1);
+    return MathLibrary.format(v);
   }
 
   double _niceStep(double rough) {

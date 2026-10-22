@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
+import '../../data/services/math_library.dart';
 
 /// Geometrie : Pythagore, Thales, aires, volumes, vecteurs 3D
 class GeometryScreen extends StatefulWidget {
@@ -66,7 +67,7 @@ class _GeometryScreenState extends State<GeometryScreen> {
           buffer.writeln('$a^2 + $b^2 = c^2');
           buffer.writeln('c = sqrt(${a * a + b * b}) = $hyp');
           setState(() {
-            _result = 'Hypotenuse c ≈ ${hyp.toStringAsFixed(6)}';
+            _result = 'Hypotenuse c = ${MathLibrary.format(hyp)}';
             _steps = buffer.toString();
           });
         } else if (a != null && c != null && b == null) {
@@ -80,7 +81,7 @@ class _GeometryScreenState extends State<GeometryScreen> {
           final side = math.sqrt(c * c - a * a);
           buffer.writeln('b = sqrt(c^2 - a^2) = $side');
           setState(() {
-            _result = 'Cote b ≈ ${side.toStringAsFixed(6)}';
+            _result = 'Cote b = ${MathLibrary.format(side)}';
             _steps = buffer.toString();
           });
         } else {
@@ -101,7 +102,7 @@ class _GeometryScreenState extends State<GeometryScreen> {
           buffer.writeln('AD/AB = AE/AC');
           buffer.writeln('AC = $ae * $ab / $ad = $result');
           setState(() {
-            _result = 'AC ≈ ${result.toStringAsFixed(6)}';
+            _result = 'AC = ${MathLibrary.format(result)}';
             _steps = buffer.toString();
           });
         } else {
@@ -132,7 +133,7 @@ class _GeometryScreenState extends State<GeometryScreen> {
           final r = _v('r') ?? 0;
           final aire = math.pi * r * r;
           setState(() {
-            _result = 'Aire ≈ ${aire.toStringAsFixed(6)}';
+            _result = 'Aire = ${MathLibrary.format(aire)}';
             _steps = 'Aire cercle = pi * r^2';
           });
         }
@@ -150,7 +151,7 @@ class _GeometryScreenState extends State<GeometryScreen> {
           final r = _v('r') ?? 0;
           final vol = (4 / 3) * math.pi * r * r * r;
           setState(() {
-            _result = 'Volume ≈ ${vol.toStringAsFixed(6)}';
+            _result = 'Volume = ${MathLibrary.format(vol)}';
             _steps = 'Volume sphere = (4/3) * pi * r^3';
           });
         } else {
@@ -158,7 +159,7 @@ class _GeometryScreenState extends State<GeometryScreen> {
           final h = _v('h') ?? 0;
           final vol = math.pi * r * r * h;
           setState(() {
-            _result = 'Volume ≈ ${vol.toStringAsFixed(6)}';
+            _result = 'Volume = ${MathLibrary.format(vol)}';
             _steps = 'Volume cylindre = pi * r^2 * h';
           });
         }
@@ -188,16 +189,17 @@ class _GeometryScreenState extends State<GeometryScreen> {
         buffer.writeln('u = ($ux, $uy, $uz)');
         buffer.writeln('v = ($vx, $vy, $vz)');
         buffer.writeln('');
-        buffer.writeln('Produit scalaire u·v = $ux*$vx + $uy*$vy + $uz*$vz = $dot');
+        buffer.writeln(
+            'Produit scalaire u·v = $ux*$vx + $uy*$vy + $uz*$vz = $dot');
         buffer.writeln('Produit vectoriel u×v = ($cx, $cy, $cz)');
         buffer.writeln('|u| = $nu');
         buffer.writeln('|v| = $nv');
         buffer.writeln('|u×v| = $nc');
-        buffer.writeln('Angle (u,v) ≈ ${angleDeg.toStringAsFixed(4)}°');
+        buffer.writeln('Angle (u,v) = ${MathLibrary.format(angleDeg)}°');
 
         setState(() {
           _result =
-              'u·v = $dot\nu×v = ($cx, $cy, $cz)\n|u|=${nu.toStringAsFixed(4)}  |v|=${nv.toStringAsFixed(4)}\nAngle ≈ ${angleDeg.toStringAsFixed(2)}°';
+              'u·v = ${MathLibrary.format(dot)}\nu×v = (${MathLibrary.format(cx)}, ${MathLibrary.format(cy)}, ${MathLibrary.format(cz)})\n|u|=${MathLibrary.format(nu)}  |v|=${MathLibrary.format(nv)}\nAngle = ${MathLibrary.format(angleDeg)}°';
           _steps = buffer.toString();
         });
         break;
@@ -247,7 +249,8 @@ class _GeometryScreenState extends State<GeometryScreen> {
               onChanged: (v) => setState(() => _c('shape').text = v!),
               decoration: InputDecoration(
                 labelText: 'Figure',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 12),
@@ -271,7 +274,8 @@ class _GeometryScreenState extends State<GeometryScreen> {
               onChanged: (v) => setState(() => _c('shape').text = v!),
               decoration: InputDecoration(
                 labelText: 'Solide',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 12),
@@ -283,7 +287,8 @@ class _GeometryScreenState extends State<GeometryScreen> {
             ] else
               _field('a', 'Arete a'),
           ] else if (_tool == 'vecteurs') ...[
-            const Text('Vecteur u', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Vecteur u',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             Row(children: [
               Expanded(child: _field('ux', 'ux')),
               const SizedBox(width: 8),
@@ -291,7 +296,8 @@ class _GeometryScreenState extends State<GeometryScreen> {
               const SizedBox(width: 8),
               Expanded(child: _field('uz', 'uz')),
             ]),
-            const Text('Vecteur v', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Vecteur v',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             Row(children: [
               Expanded(child: _field('vx', 'vx')),
               const SizedBox(width: 8),
@@ -305,29 +311,34 @@ class _GeometryScreenState extends State<GeometryScreen> {
             onPressed: _calculate,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text('Calculer'),
           ),
           if (_result.isNotEmpty) ...[
             const SizedBox(height: 24),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(18),
                 child: Text(
                   _result,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, height: 1.4),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold, height: 1.4),
                   textAlign: TextAlign.center,
                 ),
               ),
             ).animate().fadeIn().scale(),
             const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(_steps, style: const TextStyle(height: 1.45, fontSize: 13)),
+                child: Text(_steps,
+                    style: const TextStyle(height: 1.45, fontSize: 13)),
               ),
             ).animate().fadeIn(delay: 80.ms),
           ],
@@ -351,7 +362,8 @@ class _GeometryScreenState extends State<GeometryScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: TextField(
         controller: _c(key),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+        keyboardType:
+            const TextInputType.numberWithOptions(decimal: true, signed: true),
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

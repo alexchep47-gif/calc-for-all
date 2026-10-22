@@ -16,21 +16,38 @@ class MathLibrary {
 
   /// Fonctions reconnues (nom normalise → evaluation)
   static const Set<String> functionNames = {
-    'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
-    'sinh', 'cosh', 'tanh',
-    'sqrt', 'cbrt', 'abs', 'exp', 'ln', 'log', 'log10', 'log2',
-    'floor', 'ceil', 'round', 'sign',
-    'fact', 'factorial',
+    'sin',
+    'cos',
+    'tan',
+    'asin',
+    'acos',
+    'atan',
+    'atan2',
+    'sinh',
+    'cosh',
+    'tanh',
+    'sqrt',
+    'cbrt',
+    'abs',
+    'exp',
+    'ln',
+    'log',
+    'log10',
+    'log2',
+    'floor',
+    'ceil',
+    'round',
+    'sign',
+    'fact',
+    'factorial',
   };
 
   // ——— Fonctions numeriques ———
   static double sin(double x) => math.sin(x);
   static double cos(double x) => math.cos(x);
   static double tan(double x) => math.tan(x);
-  static double asin(double x) =>
-      x.abs() <= 1 ? math.asin(x) : double.nan;
-  static double acos(double x) =>
-      x.abs() <= 1 ? math.acos(x) : double.nan;
+  static double asin(double x) => x.abs() <= 1 ? math.asin(x) : double.nan;
+  static double acos(double x) => x.abs() <= 1 ? math.acos(x) : double.nan;
   static double atan(double x) => math.atan(x);
   static double atan2(double y, double x) => math.atan2(y, x);
 
@@ -59,9 +76,8 @@ class MathLibrary {
   }
 
   static double sqrt(double x) => x >= 0 ? math.sqrt(x) : double.nan;
-  static double cbrt(double x) => x >= 0
-      ? math.pow(x, 1 / 3).toDouble()
-      : -math.pow(-x, 1 / 3).toDouble();
+  static double cbrt(double x) =>
+      x >= 0 ? math.pow(x, 1 / 3).toDouble() : -math.pow(-x, 1 / 3).toDouble();
   static double abs(double x) => x.abs();
   static double exp(double x) => math.exp(x);
   static double ln(double x) => x > 0 ? math.log(x) : double.nan;
@@ -211,8 +227,8 @@ class MathLibrary {
         result.add(source.substring(start, i));
       } else if (RegExp(r'[a-zA-Z_]').hasMatch(c)) {
         final start = i++;
-        while (i < source.length &&
-            RegExp(r'[a-zA-Z_0-9]').hasMatch(source[i])) {
+        while (
+            i < source.length && RegExp(r'[a-zA-Z_0-9]').hasMatch(source[i])) {
           i++;
         }
         result.add(source.substring(start, i));
@@ -269,10 +285,10 @@ class MathLibrary {
 
   static String? toSimpleFraction(double value) {
     if (value == 0) return '0';
-    const maxDenom = 100;
+    const maxDenom = 10000;
     for (var denom = 1; denom <= maxDenom; denom++) {
       final num = (value * denom).round();
-      if ((num / denom - value).abs() < 1e-9) {
+      if ((num / denom - value).abs() < 1e-10) {
         final g = _gcd(num.abs(), denom);
         final n = num ~/ g;
         final d = denom ~/ g;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
+import '../../data/services/math_library.dart';
 
 /// Solveur d'équations polynomiales de degré n
 /// - Degré 1 & 2 : solutions exactes + étapes
@@ -75,7 +76,8 @@ class _SolverScreenState extends State<SolverScreen> {
 
     if (realDegree == 0) {
       setState(() {
-        _result = coeffs.last == 0 ? 'Identité (toujours vrai)' : 'Aucune solution';
+        _result =
+            coeffs.last == 0 ? 'Identité (toujours vrai)' : 'Aucune solution';
         _steps = buffer.toString();
       });
       return;
@@ -88,9 +90,9 @@ class _SolverScreenState extends State<SolverScreen> {
       final x = -b / a;
       buffer.writeln('Forme : ax + b = 0');
       buffer.writeln('a = $a , b = $b');
-      buffer.writeln('Solution exacte : x = -b / a = ${x.toStringAsFixed(8)}');
+      buffer.writeln('Solution exacte : x = -b / a = ${MathLibrary.format(x)}');
       setState(() {
-        _result = 'x = ${x.toStringAsFixed(8)}';
+        _result = 'x = ${MathLibrary.format(x)}';
         _steps = buffer.toString();
       });
       return;
@@ -112,18 +114,19 @@ class _SolverScreenState extends State<SolverScreen> {
         final x1 = (-b + math.sqrt(delta)) / (2 * a);
         final x2 = (-b - math.sqrt(delta)) / (2 * a);
         buffer.writeln('Δ > 0 → deux solutions réelles distinctes');
-        buffer.writeln('x₁ = (-b + √Δ) / 2a = ${x1.toStringAsFixed(8)}');
-        buffer.writeln('x₂ = (-b − √Δ) / 2a = ${x2.toStringAsFixed(8)}');
+        buffer.writeln('x₁ = (-b + √Δ) / 2a = ${MathLibrary.format(x1)}');
+        buffer.writeln('x₂ = (-b − √Δ) / 2a = ${MathLibrary.format(x2)}');
         setState(() {
-          _result = 'x₁ = ${x1.toStringAsFixed(6)}\nx₂ = ${x2.toStringAsFixed(6)}';
+          _result =
+              'x₁ = ${MathLibrary.format(x1)}\nx₂ = ${MathLibrary.format(x2)}';
           _steps = buffer.toString();
         });
       } else if (delta.abs() < 1e-10) {
         final x = -b / (2 * a);
         buffer.writeln('Δ = 0 → une solution double');
-        buffer.writeln('x = -b / 2a = ${x.toStringAsFixed(8)}');
+        buffer.writeln('x = -b / 2a = ${MathLibrary.format(x)}');
         setState(() {
-          _result = 'x = ${x.toStringAsFixed(6)} (double)';
+          _result = 'x = ${MathLibrary.format(x)} (double)';
           _steps = buffer.toString();
         });
       } else {
@@ -155,11 +158,11 @@ class _SolverScreenState extends State<SolverScreen> {
 
     buffer.writeln('Racines réelles approchées trouvées :');
     for (int i = 0; i < roots.length; i++) {
-      buffer.writeln('  x${i + 1} ≈ ${roots[i].toStringAsFixed(8)}');
+      buffer.writeln('  x${i + 1} = ${MathLibrary.format(roots[i])}');
     }
 
     setState(() {
-      _result = roots.map((r) => 'x ≈ ${r.toStringAsFixed(6)}').join('\n');
+      _result = roots.map((r) => 'x = ${MathLibrary.format(r)}').join('\n');
       _steps = buffer.toString();
     });
   }
@@ -186,7 +189,20 @@ class _SolverScreenState extends State<SolverScreen> {
 
   List<double> _findRootsNumerically(List<double> coeffs) {
     final roots = <double>[];
-    final starts = [-10.0, -5.0, -2.0, -1.0, -0.5, 0.5, 1.0, 2.0, 5.0, 10.0, -20.0, 20.0];
+    final starts = [
+      -10.0,
+      -5.0,
+      -2.0,
+      -1.0,
+      -0.5,
+      0.5,
+      1.0,
+      2.0,
+      5.0,
+      10.0,
+      -20.0,
+      20.0
+    ];
 
     for (final start in starts) {
       double x = start;
@@ -248,7 +264,8 @@ class _SolverScreenState extends State<SolverScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Degré du polynôme', style: Theme.of(context).textTheme.titleMedium),
+          Text('Degré du polynôme',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -267,11 +284,13 @@ class _SolverScreenState extends State<SolverScreen> {
                   },
                 ),
               ),
-              Text('n = $_degree', style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('n = $_degree',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 12),
-          Text('Coefficients (aₙ → a₀)', style: Theme.of(context).textTheme.titleSmall),
+          Text('Coefficients (aₙ → a₀)',
+              style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           ...List.generate(_controllers.length, (i) {
             final power = _degree - i;
@@ -279,10 +298,14 @@ class _SolverScreenState extends State<SolverScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: TextField(
                 controller: _controllers[i],
-                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
                 decoration: InputDecoration(
-                  labelText: power == 0 ? 'a₀ (constante)' : 'a$power (coeff de x^$power)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  labelText: power == 0
+                      ? 'a₀ (constante)'
+                      : 'a$power (coeff de x^$power)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             );
@@ -292,36 +315,48 @@ class _SolverScreenState extends State<SolverScreen> {
             onPressed: _solve,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text('Résoudre', style: TextStyle(fontSize: 17)),
           ),
           if (_result.isNotEmpty) ...[
             const SizedBox(height: 24),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(18),
                 child: Column(
                   children: [
-                    const Text('Solutions', style: TextStyle(color: Colors.grey)),
+                    const Text('Solutions',
+                        style: TextStyle(color: Colors.grey)),
                     const SizedBox(height: 8),
-                    Text(_result, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, height: 1.4), textAlign: TextAlign.center),
+                    Text(_result,
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            height: 1.4),
+                        textAlign: TextAlign.center),
                   ],
                 ),
               ),
             ).animate().fadeIn().scale(),
             const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Étapes & explications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Étapes & explications',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
-                    Text(_steps, style: const TextStyle(height: 1.45, fontSize: 13)),
+                    Text(_steps,
+                        style: const TextStyle(height: 1.45, fontSize: 13)),
                   ],
                 ),
               ),

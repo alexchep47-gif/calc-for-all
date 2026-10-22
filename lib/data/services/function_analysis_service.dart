@@ -138,12 +138,12 @@ class FunctionAnalysisService {
     final period = _period(normalized);
     final symmetry = _symmetry(normalized);
 
-    final explanations = '''Etude par points remarquables (methode epuree) :
+    final explanations = '''Étude par points remarquables (méthode épurée) :
 
-1. Racines : resoudre f(x) = 0
-2. Ordonnee a l'origine : f(0) si 0 ∈ D
-3. Extrema : resoudre f'(x) = 0 puis signe de f'
-4. Inflexion : resoudre f''(x) = 0 si changement de convexite
+1. Racines : résoudre f(x) = 0
+2. Ordonnée à l'origine : f(0) si 0 ∈ D
+3. Extrema : résoudre f′(x) = 0 puis étudier le signe de f′
+4. Inflexion : résoudre f″(x) = 0 si changement de convexité
 5. Tableau de variation : uniquement bornes du domaine + points critiques
 
 Fonction : f(x) = $expression
@@ -369,8 +369,9 @@ f''(x) = $secondDeriv
     // Mieux : afficher valeurs aux bornes et critiques
     buf.writeln('f     | ${values.join('  |  ')}');
     buf.writeln('');
-    buf.writeln('Lecture : seules les bornes (±∞ / domaine) et les x ou f\'=0');
-    buf.writeln('figurent dans le tableau (methode epuree type sujet).');
+    buf.writeln(
+        'Lecture : seules les bornes (±∞ / domaine) et les x où f′ = 0');
+    buf.writeln('figurent dans le tableau (méthode épurée type sujet).');
 
     // Version compacte ASCII plus lisible
     buf.writeln('');

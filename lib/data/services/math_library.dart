@@ -275,20 +275,24 @@ class MathLibrary {
     if (c == c.roundToDouble() && c.abs() < 1e15) {
       return c.toInt().toString();
     }
-    final frac = toSimpleFraction(c);
-    if (frac != null) return frac;
-    var s = c.toStringAsFixed(12);
-    s = s.replaceAll(RegExp(r'0+$'), '');
-    s = s.replaceAll(RegExp(r'\.$'), '');
-    return s;
+    return toSimpleFraction(c) ?? c.toString();
   }
 
   static String? toSimpleFraction(double value) {
     if (value == 0) return '0';
     const maxDenom = 10000;
+    var bestNumerator = value.round();
+    var bestDenominator = 1;
+    var bestError = (bestNumerator / bestDenominator - value).abs();
     for (var denom = 1; denom <= maxDenom; denom++) {
       final num = (value * denom).round();
-      if ((num / denom - value).abs() < 1e-10) {
+      final error = (num / denom - value).abs();
+      if (error < bestError) {
+        bestNumerator = num;
+        bestDenominator = denom;
+        bestError = error;
+      }
+      if (error < 1e-10) {
         final g = _gcd(num.abs(), denom);
         final n = num ~/ g;
         final d = denom ~/ g;
@@ -296,7 +300,11 @@ class MathLibrary {
         return '$n/$d';
       }
     }
-    return null;
+    final g = _gcd(bestNumerator.abs(), bestDenominator);
+    final n = bestNumerator ~/ g;
+    final d = bestDenominator ~/ g;
+    if (d == 1) return n.toString();
+    return '$n/$d';
   }
 
   static int _gcd(int a, int b) {

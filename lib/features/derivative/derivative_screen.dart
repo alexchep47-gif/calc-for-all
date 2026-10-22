@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/services/math_expression_engine.dart';
 import '../../data/services/math_library.dart';
+import '../../data/services/math_pretty.dart';
 
-/// Module Dérivée & Intégrale (symbolique hors-ligne + calcul numérique optionnel).
+/// Module Dérivée & Intégrale — composées, parties, changement de variable
 class DerivativeScreen extends StatefulWidget {
   const DerivativeScreen({super.key});
 
@@ -13,15 +14,15 @@ class DerivativeScreen extends StatefulWidget {
 
 class _DerivativeScreenState extends State<DerivativeScreen> {
   final TextEditingController _funcController =
-      TextEditingController(text: 'x^2');
+      TextEditingController(text: 'sin(2*x)');
   final TextEditingController _xController = TextEditingController();
   final TextEditingController _aController = TextEditingController(text: '0');
   final TextEditingController _bController = TextEditingController(text: '1');
-  String _mode = 'derivée'; // derivée, intégrale
+  String _mode = 'derivée';
   String _result = '';
   String _numericResult = '';
   String _steps = '';
-  bool _definedIntegral = true;
+  bool _definedIntegral = false;
 
   final MathExpressionEngine _engine = MathExpressionEngine();
 
@@ -44,112 +45,154 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
       return;
     }
 
-    final buffer = StringBuffer();
-
     if (_mode == 'derivée') {
       final symbolic = _engine.derivativePretty(expr);
+      final steps = _engine.derivativeSteps(expr);
+
       if (symbolic == null) {
         setState(() {
           _result = 'Dérivée symbolique non disponible';
           _numericResult = '';
-          _steps = '';
+          _steps = steps;
         });
         return;
       }
 
-      buffer.writeln('Fonction : f(x) = $expr');
+      final buffer = StringBuffer(steps);
       buffer.writeln();
-      buffer.writeln('Méthode : dérivation symbolique hors-ligne');
-      buffer.writeln(
-          'Application récursive des règles de somme, produit, quotient, puissance et fonctions usuelles.');
-      buffer.writeln();
-      buffer.writeln('Forme algébrique : f′(x) = $symbolic');
-      buffer.writeln();
+
       if (_xController.text.trim().isNotEmpty) {
         final x0 = double.tryParse(_xController.text.replaceAll(',', '.'));
-        final value = x0 == null ? null : _engine.evaluate(symbolic, x0);
+        // Évaluer la dérivée brute si possible
+        final raw = _engine.derivative(expr);
+        final value = x0 == null || raw == null
+            ? null
+            : _engine.evaluate(raw, x0);
         if (value != null) {
           _numericResult =
               'f′(${_xController.text.trim()}) = ${MathLibrary.format(value)}';
           buffer.writeln(_numericResult);
         } else {
           _numericResult = 'Valeur de x hors du domaine de définition';
+          buffer.writeln(_numericResult);
         }
       } else {
         _numericResult = '';
-        buffer.writeln('Aucune valeur numérique demandée.');
       }
 
-      // Quelques règles classiques rappelées
       buffer.writeln();
-      buffer.writeln('Rappels de règles usuelles :');
-      buffer.writeln('• (xⁿ)′ = n·xⁿ⁻¹');
-      buffer.writeln('• (sin x)′ = cos x');
-      buffer.writeln('• (cos x)′ = −sin x');
-      buffer.writeln('• (eˣ)′ = eˣ');
-      buffer.writeln('• (ln x)′ = 1/x');
+      buffer.writeln('Exemples de composées gérées :');
+      buffer.writeln('• sin(2x), cos(x²), exp(3x+1), ln(x+1), √(x²+1)');
+      buffer.writeln('• Règle de la chaîne : [g(u)]′ = g′(u)·u′');
 
       setState(() {
         _result = 'f′(x) = $symbolic';
         _steps = buffer.toString();
       });
     } else {
-      final primitive = _engine.antiderivativePretty(expr);
+      // Intégrale
+      final integ = _engine.integrateSymbolic(expr);
+
       if (!_definedIntegral) {
         setState(() {
-          _result = primitive == null
-              ? 'Primitive symbolique non disponible'
-              : '∫ $expr dx = $primitive';
-          _steps = primitive == null
-              ? 'Cette forme nécessite une méthode numérique ou une règle supplémentaire.'
-              : 'Primitive générale, sans borne et sans valeur de x.\n$primitive';
+          if (integ.primitive == null) {
+            _result = 'Primitive non trouvée pour cette forme';
+            _steps = integ.steps;
+          } else {
+            _result = '∫ ${MathPretty.format(expr)} dx = ${integ.primitive}';
+            _steps =
+                'Méthode : ${integ.method}\n\n${integ.steps}';
+          }
+          _numericResult = '';
         });
         return;
       }
-      // Intégrale définie (méthode des trapèzes)
+
+      // Intégrale définie (trapèzes) + rappel symbolique si dispo
       final a = double.tryParse(_aController.text.replaceAll(',', '.')) ?? 0;
       final b = double.tryParse(_bController.text.replaceAll(',', '.')) ?? 1;
       const n = 200;
       final h = (b - a) / n;
-      double sum = 0;
 
       final fa = _eval(expr, a);
       final fb = _eval(expr, b);
       if (fa == null || fb == null) {
         setState(() {
-          _result = 'Impossible d’évaluer la fonction';
+          _result = 'Impossible d’évaluer la fonction aux bornes';
           _steps = '';
         });
         return;
       }
 
-      sum = (fa + fb) / 2;
+      double sum = (fa + fb) / 2;
       for (int i = 1; i < n; i++) {
-        final xi = a + i * h;
-        final yi = _eval(expr, xi);
+        final yi = _eval(expr, a + i * h);
         if (yi != null) sum += yi;
       }
       final integral = sum * h;
 
-      buffer.writeln('Fonction : f(x) = $expr');
+      final buffer = StringBuffer();
+      buffer.writeln('Fonction : f(x) = ${MathPretty.format(expr)}');
       buffer.writeln('Intervalle : [$a ; $b]');
       buffer.writeln();
-      buffer.writeln('Méthode : trapèzes (n = $n subdivisions)');
-      buffer.writeln('∫ₐᵇ f(x) dx ≈ (h/2) · [f(a) + 2Σf(xi) + f(b)]');
-      buffer.writeln();
-      buffer.writeln('Résultat approximatif : ${MathLibrary.format(integral)}');
+      if (integ.primitive != null) {
+        buffer.writeln('Primitive symbolique (${integ.method}) :');
+        buffer.writeln('  ${integ.primitive}');
+        buffer.writeln();
+      }
+      buffer.writeln('Méthode numérique : trapèzes (n = $n)');
+      buffer.writeln('∫ₐᵇ f ≈ ${MathLibrary.format(integral)}');
 
       setState(() {
         _result = '∫ ≈ ${MathLibrary.format(integral)}';
         _steps = buffer.toString();
+        _numericResult = '';
       });
     }
+  }
+
+  void _loadExample() {
+    if (_mode == 'derivée') {
+      const examples = [
+        'sin(2*x)',
+        'cos(x^2)',
+        'exp(3*x+1)',
+        'ln(x+1)',
+        'sqrt(x^2+1)',
+        'x*sin(x)',
+      ];
+      final cur = _funcController.text.trim();
+      final i = examples.indexOf(cur);
+      _funcController.text = examples[(i + 1) % examples.length];
+    } else {
+      const examples = [
+        'x*sin(x)',
+        'x*exp(x)',
+        'ln(x)',
+        'sin(2*x)',
+        '1/(2*x+1)',
+        '(3*x+1)^2',
+        'x*ln(x)',
+      ];
+      final cur = _funcController.text.trim();
+      final i = examples.indexOf(cur);
+      _funcController.text = examples[(i + 1) % examples.length];
+    }
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dérivée & Intégrale')),
+      appBar: AppBar(
+        title: const Text('Dérivée & Intégrale'),
+        actions: [
+          TextButton(
+            onPressed: _loadExample,
+            child: const Text('Exemple'),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -159,16 +202,22 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
               ButtonSegment(value: 'intégrale', label: Text('Intégrale')),
             ],
             selected: {_mode},
-            onSelectionChanged: (s) => setState(() => _mode = s.first),
+            onSelectionChanged: (s) => setState(() {
+              _mode = s.first;
+              _result = '';
+              _steps = '';
+            }),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _funcController,
             decoration: InputDecoration(
               labelText: 'f(x) =',
-              hintText: 'ex: x^2, sin(x), 1/x',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              hintText: _mode == 'derivée'
+                  ? 'ex: sin(2*x), cos(x^2), ln(x+1)'
+                  : 'ex: x*sin(x), ln(x), sin(2*x)',
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 12),
@@ -179,9 +228,9 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
                   const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: 'Valeur de x (optionnel)',
-                hintText: 'Laisser vide pour garder la forme générale',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                hintText: 'Laisser vide pour la forme générale',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
             )
           else
@@ -191,7 +240,7 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Intégrale définie'),
                   subtitle: const Text(
-                      'Désactiver pour afficher la primitive générale'),
+                      'Désactiver pour la primitive (parties / substitution)'),
                   value: _definedIntegral,
                   onChanged: (value) =>
                       setState(() => _definedIntegral = value),
@@ -203,11 +252,10 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
                         child: TextField(
                           controller: _aController,
                           keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          decoration: InputDecoration(
-                            labelText: 'a (borne inf)',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                              decimal: true, signed: true),
+                          decoration: const InputDecoration(
+                            labelText: 'a',
+                            border: OutlineInputBorder(),
                           ),
                         ),
                       ),
@@ -216,11 +264,10 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
                         child: TextField(
                           controller: _bController,
                           keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          decoration: InputDecoration(
-                            labelText: 'b (borne sup)',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                              decimal: true, signed: true),
+                          decoration: const InputDecoration(
+                            labelText: 'b',
+                            border: OutlineInputBorder(),
                           ),
                         ),
                       ),
@@ -228,97 +275,59 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
                   ),
               ],
             ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _symbolButton('a⁄b', '(a)/(b)'),
-              _symbolButton('√', 'sqrt()'),
-              _symbolButton('ⁿ√', 'x^(1/n)'),
-              _symbolButton('xⁿ', 'x^n'),
-              _symbolButton('∫', '∫()dx'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          FilledButton(
+          const SizedBox(height: 16),
+          FilledButton.icon(
             onPressed: _calculate,
+            icon: const Icon(Icons.functions),
+            label: Text(_mode == 'derivée' ? 'Dériver' : 'Intégrer'),
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+              minimumSize: const Size.fromHeight(48),
             ),
-            child: Text(_mode == 'derivée'
-                ? 'Calculer la dérivée'
-                : 'Calculer l’intégrale'),
           ),
           if (_result.isNotEmpty) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Text(_result,
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center),
-              ),
-            ).animate().fadeIn().scale(),
-            if (_mode == 'derivée' && _numericResult.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Card(
-                  color: Theme.of(context).colorScheme.secondaryContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Text(
-                      _numericResult,
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w600),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 12),
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Explications pas-à-pas',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 10),
-                    Text(_steps,
-                        style: const TextStyle(height: 1.45, fontSize: 13)),
+                    Text(
+                      _result,
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    if (_numericResult.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(_numericResult),
+                    ],
                   ],
                 ),
               ),
-            ).animate().fadeIn(delay: 100.ms),
+            ).animate().fadeIn(),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Démarche pas à pas',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      _steps,
+                      style: const TextStyle(height: 1.45, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ],
       ),
-    );
-  }
-
-  Widget _symbolButton(String label, String insertion) {
-    return OutlinedButton(
-      onPressed: () {
-        final text = _funcController.text;
-        final selection = _funcController.selection;
-        final start = selection.start < 0 ? text.length : selection.start;
-        final end = selection.end < 0 ? text.length : selection.end;
-        _funcController.text = text.replaceRange(start, end, insertion);
-        _funcController.selection =
-            TextSelection.collapsed(offset: start + insertion.length);
-        setState(() {});
-      },
-      child: Text(label, style: const TextStyle(fontSize: 18)),
     );
   }
 }

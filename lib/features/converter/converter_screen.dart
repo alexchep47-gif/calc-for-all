@@ -157,7 +157,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
     },
   };
 
-  static const mathPi = 3.141592653589793;
+  static const double mathPi = 3.141592653589793;
 
   List<String> get _currentUnits => _units[_category]!.keys.toList();
 
@@ -204,14 +204,12 @@ class _ConverterScreenState extends State<ConverterScreen> {
 
     double result = 0;
     for (int i = 0; i < integerPart.length; i++) {
-      final char = integerPart[i];
-      final digit = _digitValue(char);
+      final digit = _digitValue(integerPart[i]);
       result = result * base + digit;
     }
 
     for (int i = 0; i < fractionalPart.length; i++) {
-      final char = fractionalPart[i];
-      final digit = _digitValue(char);
+      final digit = _digitValue(fractionalPart[i]);
       result += digit / math.pow(base, i + 1);
     }
 
@@ -246,7 +244,8 @@ class _ConverterScreenState extends State<ConverterScreen> {
       if (fraction == 0) break;
     }
 
-    final fractionString = fractionBuffer.isNotEmpty ? '.${fractionBuffer.toString()}' : '';
+    final fractionString =
+        fractionBuffer.isNotEmpty ? '.${fractionBuffer.toString()}' : '';
     return '$sign$integerString$fractionString';
   }
 
@@ -259,12 +258,12 @@ class _ConverterScreenState extends State<ConverterScreen> {
   }
 
   void _convert() {
-    final raw = _valueController.text.replaceAll(',', '.');
+    final raw = _valueController.text.trim().replaceAll(',', '.');
     final locale = context.read<LocaleProvider>();
     final isFr = locale.isFrench;
 
     if (_category == 'Numération') {
-      if (raw.trim().isEmpty) {
+      if (raw.isEmpty) {
         setState(() {
           _result = isFr ? 'Valeur invalide' : 'Invalid value';
           _steps = '';
@@ -278,7 +277,10 @@ class _ConverterScreenState extends State<ConverterScreen> {
 
       setState(() {
         _result = '$converted $_to';
-        _steps = '${isFr ? 'Conversion de base' : 'Base conversion'} $fromBase ${isFr ? 'vers' : 'to'} $toBase\n${isFr ? 'Valeur' : 'Value'}: $raw ($_from)\n${isFr ? 'Résultat' : 'Result'}: $converted $_to';
+        _steps = '${isFr ? 'Conversion de base' : 'Base conversion'} '
+            '$fromBase ${isFr ? 'vers' : 'to'} $toBase\n'
+            '${isFr ? 'Valeur' : 'Value'}: $raw ($_from)\n'
+            '${isFr ? 'Résultat' : 'Result'}: $converted $_to';
       });
       return;
     }
@@ -299,15 +301,18 @@ class _ConverterScreenState extends State<ConverterScreen> {
       double celsius;
       if (_from == '°C') {
         celsius = parsed;
-        buffer.writeln('${isFr ? 'Valeur déjà en °C' : 'Already in °C'} : ${MathLibrary.format(parsed)}');
+        buffer.writeln(
+            '${isFr ? 'Valeur déjà en °C' : 'Already in °C'} : ${MathLibrary.format(parsed)}');
       } else if (_from == '°F') {
         celsius = (parsed - 32) * 5 / 9;
-        buffer.writeln('${isFr ? 'Formule °F → °C' : 'Formula °F → °C'} : (°F − 32) × 5/9');
+        buffer.writeln(
+            '${isFr ? 'Formule °F → °C' : 'Formula °F → °C'} : (°F − 32) × 5/9');
         buffer.writeln(
             '(${MathLibrary.format(parsed)} − 32) × 5/9 = ${MathLibrary.format(celsius)}');
       } else {
         celsius = parsed - 273.15;
-        buffer.writeln('${isFr ? 'Formule K → °C' : 'Formula K → °C'} : K − 273.15');
+        buffer.writeln(
+            '${isFr ? 'Formule K → °C' : 'Formula K → °C'} : K − 273.15');
         buffer.writeln(
             '${MathLibrary.format(parsed)} − 273.15 = ${MathLibrary.format(celsius)}');
       }
@@ -326,9 +331,9 @@ class _ConverterScreenState extends State<ConverterScreen> {
       final base = parsed * fromFactor;
       result = base / toFactor;
       buffer.writeln(
-          '1 $_from = ${MathLibrary.format(fromFactor)} (${isFr ? 'unité de base' : 'base unit')})');
+          '1 $_from = ${MathLibrary.format(fromFactor)} (${isFr ? 'unité de base' : 'base unit'})');
       buffer.writeln(
-          '${MathLibrary.format(parsed)} $_from = ${MathLibrary.format(base)} (${isFr ? 'base' : 'base')})');
+          '${MathLibrary.format(parsed)} $_from = ${MathLibrary.format(base)} (${isFr ? 'base' : 'base'})');
       buffer.writeln(
           '1 $_to = ${MathLibrary.format(toFactor)} (${isFr ? 'base' : 'base'}) → ${isFr ? 'résultat' : 'result'} = base / facteur');
     }

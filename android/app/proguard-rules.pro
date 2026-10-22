@@ -4,8 +4,19 @@
 -keep class com.google.mlkit.vision.text.devanagari.** { *; }
 -keep class com.google.mlkit.vision.text.japanese.** { *; }
 -keep class com.google.mlkit.vision.text.korean.** { *; }
--keep class com.google.android.gms.vision.** { *; }
+
+# Keep Play Core / deferred component classes used by Flutter Android embedding
+-keep class com.google.android.play.core.** { *; }
+-keep class com.google.android.play.core.splitcompat.SplitCompatApplication { *; }
+-keep class com.google.android.play.core.splitinstall.** { *; }
+-keep class com.google.android.play.core.tasks.** { *; }
+-keep class io.flutter.embedding.engine.deferredcomponents.** { *; }
+-keep class io.flutter.embedding.android.FlutterPlayStoreSplitApplication { *; }
 
 # Keep general Android/Flutter plugin classes
 -keep class io.flutter.plugin.common.** { *; }
 -keep class io.flutter.embedding.** { *; }
+
+# Prevent warnings from being treated as fatal for ML Kit / Play Core
+-dontwarn com.google.mlkit.vision.text.**
+-dontwarn com.google.android.play.core.**

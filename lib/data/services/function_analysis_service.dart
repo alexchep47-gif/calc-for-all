@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'graph_service.dart';
 import 'math_expression_engine.dart';
+import 'math_library.dart';
 
 class FunctionStudyResult {
   final String expression;
@@ -80,9 +81,7 @@ class FunctionAnalysisService {
     );
   }
 
-  /// Extrait le zero d'un denominateur lineaire ax+b ou (ax+b)
   double? _linearDenomZero(String expr) {
-    // Cherche pattern / (ax+b) ou /ax+b
     final patterns = [
       RegExp(r'/\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)\)'),
       RegExp(r'/\(x([-+]\d*\.?\d+)\)'),
@@ -98,14 +97,13 @@ class FunctionAnalysisService {
         final b = double.tryParse(m.group(2)!) ?? 0;
         if (a != 0) return -b / a;
       } else if (m.groupCount >= 1) {
-        // /x+b form group1 is b, a=1
         final g1 = m.group(1);
         if (g1 != null && (g1.startsWith('+') || g1.startsWith('-'))) {
           final b = double.tryParse(g1) ?? 0;
           return -b;
         }
         final a = _coefficient(g1);
-        if (a != 0) return 0; // /ax  => x=0
+        if (a != 0) return 0;
       }
     }
     if (RegExp(r'/x(?![a-z0-9.])').hasMatch(expr) ||
@@ -115,23 +113,48 @@ class FunctionAnalysisService {
     return null;
   }
 
-  String _domain(String expr) {
-    final log = RegExp(
+  /// Bound pour log(x ± c) avec c = e, pi ou nombre
+  ({double bound, bool greater})? _logBound(String expr) {
+    final m = RegExp(
+      r'log\(\s*x\s*([+-])\s*(e|pi|\d*\.?\d+)\s*\)',
+    ).firstMatch(expr);
+    if (m != null) {
+      final sign = m.group(1) == '-' ? -1.0 : 1.0;
+      final c = _constVal(m.group(2)!);
+      // x + sign*c > 0 => x > -sign*c
+      return (bound: -sign * c, greater: true);
+    }
+    final logLin = RegExp(
       r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
     ).firstMatch(expr);
-    if (log != null) {
-      final a = _coefficient(log.group(1));
-      final b = double.tryParse(log.group(2) ?? '0') ?? 0;
-      final bound = -b / a;
-      if (a > 0) {
-        return 'D = ]${_fmt(bound)} ; +inf[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0.';
-      }
-      if (a < 0) {
-        return 'D = ]-inf ; ${_fmt(bound)}[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} > 0.';
-      }
+    if (logLin != null) {
+      final a = _coefficient(logLin.group(1));
+      final b = double.tryParse(logLin.group(2) ?? '0') ?? 0;
+      if (a > 0) return (bound: -b / a, greater: true);
+      if (a < 0) return (bound: -b / a, greater: false);
     }
     if (RegExp(r'log\(x\)').hasMatch(expr)) {
-      return 'D = ]0 ; +inf[  car x > 0.';
+      return (bound: 0, greater: true);
+    }
+    return null;
+  }
+
+  double _constVal(String s) {
+    if (s == 'e') return MathLibrary.e;
+    if (s == 'pi') return MathLibrary.pi;
+    return double.tryParse(s) ?? 0;
+  }
+
+  String _domain(String expr) {
+    final parts = <String>[];
+
+    final lb = _logBound(expr);
+    if (lb != null) {
+      if (lb.greater) {
+        parts.add('x > ${_fmt(lb.bound)} (argument du log > 0)');
+      } else {
+        parts.add('x < ${_fmt(lb.bound)} (argument du log > 0)');
+      }
     }
 
     final sqrt = RegExp(
@@ -142,24 +165,37 @@ class FunctionAnalysisService {
       final b = double.tryParse(sqrt.group(2) ?? '0') ?? 0;
       final bound = -b / a;
       if (a > 0) {
-        return 'D = [${_fmt(bound)} ; +inf[  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} >= 0.';
-      }
-      if (a < 0) {
-        return 'D = ]-inf ; ${_fmt(bound)}]  car ${_fmt(a)}x ${_sign(b)} ${_fmt(b.abs())} >= 0.';
+        parts.add('x >= ${_fmt(bound)} (racine)');
+      } else if (a < 0) {
+        parts.add('x <= ${_fmt(bound)} (racine)');
       }
     }
 
     final zero = _linearDenomZero(expr);
     if (zero != null) {
-      return 'D = ]-inf ; ${_fmt(zero)}[ U ]${_fmt(zero)} ; +inf[  (denominateur nul en x = ${_fmt(zero)}).';
+      parts.add('x != ${_fmt(zero)} (denominateur lineaire nul)');
     }
-    if (expr.contains('/')) {
-      return 'D = R prive des zeros du denominateur.';
-    }
-    return 'D = R (aucune contrainte reelle detectee).';
-  }
 
-  String _sign(double b) => b >= 0 ? '+' : '-';
+    // Denom = log(...) : log != 0 => argument != 1
+    final logDenom = RegExp(
+      r'/\(?log\(\s*x\s*([+-])\s*(e|pi|\d*\.?\d+)\s*\)\)?',
+    ).firstMatch(expr);
+    if (logDenom != null) {
+      final sign = logDenom.group(1) == '-' ? -1.0 : 1.0;
+      final c = _constVal(logDenom.group(2)!);
+      // log(x+sign*c)=0 => x+sign*c=1 => x = 1 - sign*c
+      final hole = 1 - sign * c;
+      parts.add('x != ${_fmt(hole)} (log = 0 => denominateur nul)');
+    }
+
+    if (parts.isEmpty) {
+      if (expr.contains('/')) {
+        return 'D = R prive des zeros du denominateur.';
+      }
+      return 'D = R (aucune contrainte reelle detectee).';
+    }
+    return 'D : ${parts.join(' ; ')}.';
+  }
 
   double _coefficient(String? value) {
     if (value == null || value.isEmpty || value == '+') return 1;
@@ -197,42 +233,34 @@ class FunctionAnalysisService {
 
   List<String> _asymptotes(String expr, double xMin, double xMax) {
     final result = <String>[];
-    final log = RegExp(
-      r'log\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
-    ).firstMatch(expr);
-    if (log != null) {
-      final a = _coefficient(log.group(1));
-      final b = double.tryParse(log.group(2) ?? '0') ?? 0;
-      result.add('Asymptote verticale : x = ${_fmt(-b / a)}.');
-    }
-    if (RegExp(r'log\(x\)').hasMatch(expr)) {
-      result.add('Asymptote verticale : x = 0.');
+    final lb = _logBound(expr);
+    if (lb != null) {
+      result.add('Asymptote verticale : x = ${_fmt(lb.bound)} (bord du log).');
     }
     final zero = _linearDenomZero(expr);
     if (zero != null) {
       result.add('Asymptote verticale : x = ${_fmt(zero)} (denominateur nul).');
-    } else if (expr.contains('/')) {
+    }
+    final logDenom = RegExp(
+      r'/\(?log\(\s*x\s*([+-])\s*(e|pi|\d*\.?\d+)\s*\)\)?',
+    ).firstMatch(expr);
+    if (logDenom != null) {
+      final sign = logDenom.group(1) == '-' ? -1.0 : 1.0;
+      final c = _constVal(logDenom.group(2)!);
+      final hole = 1 - sign * c;
+      result.add(
+          'Asymptote verticale : x = ${_fmt(hole)} (ln = 0, denominateur nul).');
+    }
+    if (result.isEmpty && expr.contains('/')) {
       result.add('Verticales possibles aux zeros du denominateur.');
     }
     final right = _engine.evaluate(expr, xMax);
     final left = _engine.evaluate(expr, xMin);
-    if (right != null && right.abs() < 0.1) {
-      result.add('Asymptote horizontale a droite : y = 0.');
+    if (right != null && right.abs() < 0.15) {
+      result.add('Asymptote horizontale a droite : y ≈ 0.');
     }
-    if (left != null && left.abs() < 0.1) {
-      result.add('Asymptote horizontale a gauche : y = 0.');
-    }
-    // Quotient lineaire/lineaire -> asymptote y = a/c
-    final quot = RegExp(
-      r'\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)/\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
-    ).firstMatch(expr);
-    if (quot != null) {
-      final a = _coefficient(quot.group(1));
-      final c = _coefficient(quot.group(3));
-      if (c != 0) {
-        result.add(
-            'Asymptote horizontale : y = ${_fmt(a / c)} (degres egaux).');
-      }
+    if (left != null && left.abs() < 0.15) {
+      result.add('Asymptote horizontale a gauche : y ≈ 0.');
     }
     return result.isEmpty
         ? ['Aucune asymptote elementaire detectee.']
@@ -320,10 +348,10 @@ class FunctionAnalysisService {
     String period,
     String symmetry,
   ) =>
-      '''Methode hors-ligne :
-1. Normalisation : 2x devient 2*x ; ln / In devient log (logarithme naturel).
-2. Domaine : contraintes des logarithmes, racines et denominateurs.
-3. Derivee : regles de somme, produit, quotient, puissance et fonctions usuelles.
+      '''Methode hors-ligne (MathLibrary) :
+1. Normalisation : 2x → 2*x ; ln/In → log ; π → pi ; e reconnu.
+2. Domaine : log, racines, denominateurs (y compris ln = 0).
+3. Derivee symbolique : somme, produit, quotient, puissance, fonctions usuelles.
 
 Fonction : f(x) = $expression
 Domaine : $domain
@@ -331,12 +359,15 @@ Derivee : f'(x) = $derivative
 Extremums : ${extrema.join(' ; ')}
 Limites : $limits
 Asymptotes : ${asymptotes.join(' ; ')}
-Variation : le signe de f' determine les intervalles croissants et decroissants.
+Variation : signe de f'
 Periodicite : $period
 Parite : $symmetry''';
 
   String _fmt(double value) {
     if (value.abs() < 1e-9) return '0';
+    // Afficher e si proche
+    if ((value - MathLibrary.e).abs() < 0.01) return 'e';
+    if ((value - (MathLibrary.e + 1)).abs() < 0.01) return 'e+1';
     var s = value.toStringAsFixed(3);
     while (s.endsWith('0')) {
       s = s.substring(0, s.length - 1);

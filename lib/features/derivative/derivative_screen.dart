@@ -235,7 +235,7 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
             children: [
               _symbolButton('a⁄b', '(a)/(b)'),
               _symbolButton('√', 'sqrt()'),
-              _symbolButton('ⁿ√', 'root(n, )'),
+              _symbolButton('ⁿ√', 'x^(1/n)'),
               _symbolButton('xⁿ', 'x^n'),
               _symbolButton('∫', '∫()dx'),
             ],

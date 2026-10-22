@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../data/services/math_library.dart';
 import '../../data/storage/local_storage.dart';
 
-/// Suites numériques : arithmétique, géométrique, Fibonacci, récurrente, limite
+/// Suites numériques : arithmétique, géométrique, Fibonacci, récurrente
 class SequencesScreen extends StatefulWidget {
   const SequencesScreen({super.key});
 
@@ -14,7 +14,7 @@ class SequencesScreen extends StatefulWidget {
 }
 
 class _SequencesScreenState extends State<SequencesScreen> {
-  String _type = 'arithmétique';
+  String _type = 'arithmetique';
   final _u1 = TextEditingController(text: '2');
   final _r = TextEditingController(text: '3');
   final _n = TextEditingController(text: '10');
@@ -30,7 +30,7 @@ class _SequencesScreenState extends State<SequencesScreen> {
     final n = int.tryParse(_n.text);
     if (u1 == null || n == null || n < 1) {
       setState(() {
-        _result = 'Entrées invalides';
+        _result = 'Entrees invalides';
         _steps = '';
         _terms = [];
       });
@@ -39,37 +39,41 @@ class _SequencesScreenState extends State<SequencesScreen> {
 
     final buf = StringBuffer();
     final terms = <double>[];
-    double un;
-    double sn;
+    late double un;
+    late double sn;
 
     switch (_type) {
-      case 'arithmétique':
+      case 'arithmetique':
         if (r == null) return;
-        buf.writeln('Suite arithmétique : uₙ = u₁ + (n−1)·r');
-        buf.writeln('u₁ = ${MathLibrary.format(u1)}, r = ${MathLibrary.format(r)}, n = $n');
+        buf.writeln('Suite arithmetique : un = u1 + (n-1)*r');
+        buf.writeln(
+            'u1 = ${MathLibrary.format(u1)}, r = ${MathLibrary.format(r)}, n = $n');
         un = u1 + (n - 1) * r;
         sn = n * (u1 + un) / 2;
-        buf.writeln('uₙ = ${MathLibrary.format(u1)} + (${n − 1})·${MathLibrary.format(r)} = ${MathLibrary.format(un)}');
-        buf.writeln('Sₙ = n·(u₁+uₙ)/2 = ${MathLibrary.format(sn)}');
+        buf.writeln(
+            'un = ${MathLibrary.format(u1)} + (${n - 1})*${MathLibrary.format(r)} = ${MathLibrary.format(un)}');
+        buf.writeln('Sn = n*(u1+un)/2 = ${MathLibrary.format(sn)}');
         for (var k = 1; k <= n && k <= 20; k++) {
           terms.add(u1 + (k - 1) * r);
         }
         break;
 
-      case 'géométrique':
+      case 'geometrique':
         if (r == null) return;
-        buf.writeln('Suite géométrique : uₙ = u₁ · q^(n−1)');
-        buf.writeln('u₁ = ${MathLibrary.format(u1)}, q = ${MathLibrary.format(r)}, n = $n');
+        buf.writeln('Suite geometrique : un = u1 * q^(n-1)');
+        buf.writeln(
+            'u1 = ${MathLibrary.format(u1)}, q = ${MathLibrary.format(r)}, n = $n');
         un = u1 * MathLibrary.pow(r, (n - 1).toDouble());
         if ((r - 1).abs() < 1e-12) {
           sn = n * u1;
         } else {
           sn = u1 * (1 - MathLibrary.pow(r, n.toDouble())) / (1 - r);
         }
-        buf.writeln('uₙ = ${MathLibrary.format(un)}');
-        buf.writeln('Sₙ = ${MathLibrary.format(sn)}');
+        buf.writeln('un = ${MathLibrary.format(un)}');
+        buf.writeln('Sn = ${MathLibrary.format(sn)}');
         if (r.abs() < 1) {
-          buf.writeln('Comme |q| < 1, lim Sₙ = u₁/(1−q) = ${MathLibrary.format(u1 / (1 - r))}');
+          buf.writeln(
+              'Comme |q| < 1, lim Sn = u1/(1-q) = ${MathLibrary.format(u1 / (1 - r))}');
         }
         for (var k = 1; k <= n && k <= 20; k++) {
           terms.add(u1 * MathLibrary.pow(r, (k - 1).toDouble()));
@@ -77,7 +81,7 @@ class _SequencesScreenState extends State<SequencesScreen> {
         break;
 
       case 'Fibonacci':
-        buf.writeln('Suite de Fibonacci : F₁ = 1, F₂ = 1, Fₙ = Fₙ₋₁ + Fₙ₋₂');
+        buf.writeln('Suite de Fibonacci : F1=1, F2=1, Fn = F(n-1)+F(n-2)');
         var a = 1.0, b = 1.0;
         if (n == 1) {
           un = 1;
@@ -96,7 +100,6 @@ class _SequencesScreenState extends State<SequencesScreen> {
           un = b;
         }
         sn = terms.fold(0.0, (s, t) => s + t);
-        // Si n>20, recalculer somme exacte via formule F1+…+Fn = F_{n+2}-1
         if (n > 20) {
           var x = 1.0, y = 1.0;
           for (var k = 3; k <= n + 2; k++) {
@@ -104,18 +107,18 @@ class _SequencesScreenState extends State<SequencesScreen> {
             x = y;
             y = z;
           }
-          sn = y - 1; // F_{n+2} - 1
+          sn = y - 1;
         }
-        buf.writeln('Fₙ = ${MathLibrary.format(un)}');
-        buf.writeln('Sₙ ≈ ${MathLibrary.format(sn)}');
+        buf.writeln('Fn = ${MathLibrary.format(un)}');
+        buf.writeln('Sn = ${MathLibrary.format(sn)}');
         break;
 
-      case 'récurrente':
-        // u_{n+1} = a·u_n + b
+      case 'recurrente':
         final aa = double.tryParse(_a.text.replaceAll(',', '.')) ?? 1;
         final bb = double.tryParse(_b.text.replaceAll(',', '.')) ?? 0;
-        buf.writeln('Suite récurrente : uₙ₊₁ = a·uₙ + b');
-        buf.writeln('a = ${MathLibrary.format(aa)}, b = ${MathLibrary.format(bb)}, u₁ = ${MathLibrary.format(u1)}');
+        buf.writeln('Suite recurrente : u(n+1) = a*un + b');
+        buf.writeln(
+            'a = ${MathLibrary.format(aa)}, b = ${MathLibrary.format(bb)}, u1 = ${MathLibrary.format(u1)}');
         var u = u1;
         terms.add(u);
         for (var k = 2; k <= n; k++) {
@@ -124,13 +127,12 @@ class _SequencesScreenState extends State<SequencesScreen> {
         }
         un = u;
         sn = terms.fold(0.0, (s, t) => s + t);
-        // Point fixe si |a|<1 : L = b/(1-a)
         if (aa.abs() < 1) {
           final L = bb / (1 - aa);
-          buf.writeln('Point fixe L = b/(1−a) = ${MathLibrary.format(L)}');
+          buf.writeln('Point fixe L = b/(1-a) = ${MathLibrary.format(L)}');
           buf.writeln('La suite converge vers L si |a| < 1.');
         }
-        buf.writeln('uₙ = ${MathLibrary.format(un)}');
+        buf.writeln('un = ${MathLibrary.format(un)}');
         break;
 
       default:
@@ -138,7 +140,8 @@ class _SequencesScreenState extends State<SequencesScreen> {
         sn = u1;
     }
 
-    final resText = 'uₙ = ${MathLibrary.format(un)}\nSₙ = ${MathLibrary.format(sn)}';
+    final resText =
+        'un = ${MathLibrary.format(un)}\nSn = ${MathLibrary.format(sn)}';
     setState(() {
       _result = resText;
       _steps = buf.toString();
@@ -154,27 +157,25 @@ class _SequencesScreenState extends State<SequencesScreen> {
     } catch (_) {}
   }
 
-  // Fix operator − used as unicode in string interpolation above - use -
-  // Actually I used n − 1 with unicode minus in string - need ascii
-
   @override
   Widget build(BuildContext context) {
+    final labels = {
+      'arithmetique': 'Arithmetique',
+      'geometrique': 'Geometrique',
+      'Fibonacci': 'Fibonacci',
+      'recurrente': 'Recurrente',
+    };
     return Scaffold(
-      appBar: AppBar(title: const Text('Suites numériques')),
+      appBar: AppBar(title: const Text('Suites numeriques')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Wrap(
             spacing: 8,
             children: [
-              for (final t in [
-                'arithmétique',
-                'géométrique',
-                'Fibonacci',
-                'récurrente',
-              ])
+              for (final t in labels.keys)
                 ChoiceChip(
-                  label: Text(t),
+                  label: Text(labels[t]!),
                   selected: _type == t,
                   onSelected: (_) => setState(() {
                     _type = t;
@@ -186,31 +187,31 @@ class _SequencesScreenState extends State<SequencesScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _u1,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true, signed: true),
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true, signed: true),
             decoration: const InputDecoration(
-              labelText: 'Premier terme u₁',
+              labelText: 'Premier terme u1',
               border: OutlineInputBorder(),
             ),
           ),
-          if (_type == 'arithmétique' || _type == 'géométrique') ...[
+          if (_type == 'arithmetique' || _type == 'geometrique') ...[
             const SizedBox(height: 12),
             TextField(
               controller: _r,
               keyboardType: const TextInputType.numberWithOptions(
                   decimal: true, signed: true),
               decoration: InputDecoration(
-                labelText: _type == 'arithmétique' ? 'Raison r' : 'Raison q',
+                labelText: _type == 'arithmetique' ? 'Raison r' : 'Raison q',
                 border: const OutlineInputBorder(),
               ),
             ),
           ],
-          if (_type == 'récurrente') ...[
+          if (_type == 'recurrente') ...[
             const SizedBox(height: 12),
             TextField(
               controller: _a,
               decoration: const InputDecoration(
-                labelText: 'Coefficient a (uₙ₊₁ = a·uₙ + b)',
+                labelText: 'Coefficient a (u(n+1) = a*un + b)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -238,7 +239,7 @@ class _SequencesScreenState extends State<SequencesScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
-            child: const Text('Calculer uₙ et Sₙ'),
+            child: const Text('Calculer un et Sn'),
           ),
           if (_result.isNotEmpty) ...[
             const SizedBox(height: 20),
@@ -256,8 +257,7 @@ class _SequencesScreenState extends State<SequencesScreen> {
             if (_terms.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                'Premiers termes : ${_terms.map(MathLibrary.format).join(', ')}'
-                '${(_n.text.isNotEmpty && (int.tryParse(_n.text) ?? 0) > 20) ? ' …' : ''}',
+                'Premiers termes : ${_terms.map(MathLibrary.format).join(', ')}',
                 style: const TextStyle(fontSize: 13),
               ),
             ],
@@ -268,10 +268,11 @@ class _SequencesScreenState extends State<SequencesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Explications pas à pas',
+                    const Text('Explications pas a pas',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    Text(_steps, style: const TextStyle(height: 1.45, fontSize: 13)),
+                    Text(_steps,
+                        style: const TextStyle(height: 1.45, fontSize: 13)),
                   ],
                 ),
               ),

@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
 import '../models/calculation_history.dart';
 
-/// Service de stockage local (préférences + historique)
+/// Stockage local (préférences + historique global toutes rubriques)
 class LocalStorage extends ChangeNotifier {
   SharedPreferences? _prefs;
   List<CalculationHistory> _history = [];
@@ -35,11 +35,17 @@ class LocalStorage extends ChangeNotifier {
     }
   }
 
-  Future<void> addToHistory(String expression, String result) async {
+  /// Enregistre un calcul depuis n'importe quelle rubrique.
+  Future<void> addToHistory(
+    String expression,
+    String result, {
+    String module = 'Calculatrice',
+  }) async {
     final item = CalculationHistory(
       expression: expression,
       result: result,
       timestamp: DateTime.now(),
+      module: module,
     );
     _history.insert(0, item);
     if (_history.length > AppConstants.maxHistoryItems) {

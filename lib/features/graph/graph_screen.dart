@@ -14,6 +14,15 @@ import '../../data/services/function_analysis_service.dart';
 import '../../data/services/math_expression_engine.dart';
 import '../../data/services/math_library.dart';
 
+/// Couleurs type Desmos pour multi-courbes
+const _desmosColors = [
+  Color(0xFF2D70B3), // bleu
+  Color(0xFFC74440), // rouge
+  Color(0xFF388C46), // vert
+  Color(0xFF6042A6), // violet
+  Color(0xFFFA7E19), // orange
+];
+
 class GraphScreen extends StatefulWidget {
   const GraphScreen({super.key});
 
@@ -26,32 +35,45 @@ class _GraphScreenState extends State<GraphScreen>
   final GraphService _graphService = GraphService();
   final FunctionAnalysisService _analysisService = FunctionAnalysisService();
   final MathExpressionEngine _engine = MathExpressionEngine();
-  final TextEditingController _funcController =
-      TextEditingController(text: 'sin(x)');
+
+  // Liste d'expressions (style Desmos)
+  final List<TextEditingController> _exprCtrls = [
+    TextEditingController(text: 'sin(x)'),
+  ];
+  final List<bool> _exprVisible = [true];
+
   final TextEditingController _numController = TextEditingController();
   final TextEditingController _denController = TextEditingController();
 
-  List<List<MapEntry<double, double>>> _segments = [];
+  // Segments par expression
+  List<List<List<MapEntry<double, double>>>> _allSegments = [];
   FunctionStudyResult? _study;
-  double _xMin = -10;
-  double _xMax = 10;
-  double _yMin = -10;
-  double _yMax = 10;
+
+  double _xMin = -10, _xMax = 10, _yMin = -10, _yMax = 10;
   String _error = '';
   bool _loading = false;
   bool _autoDomain = true;
   bool _fractionMode = false;
+  bool _desmosLight = true; // grille claire style Desmos
+
+  // Curseurs parametres a, b, c (Desmos sliders)
+  double _a = 1, _b = 0, _c = 0;
+  bool _showSliders = false;
+
+  // Trace interactive
+  Offset? _tracePixel;
+  double? _traceX, _traceY;
+
   late TabController _tabController;
   final GlobalKey _chartKey = GlobalKey();
 
   static const _examples = [
-    'ln(2x+1)',
     'sin(x)',
-    'x^2',
-    '1/x',
-    'sqrt(x-1)',
+    'a*x^2+b*x+c',
+    'ln(2x+1)',
     '(2x+1)/(x-3)',
     '(2x+1)/ln(x-e)',
+    'cos(x)',
   ];
   int _exampleIndex = 0;
 
@@ -65,10 +87,57 @@ class _GraphScreenState extends State<GraphScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _funcController.dispose();
+    for (final c in _exprCtrls) {
+      c.dispose();
+    }
     _numController.dispose();
     _denController.dispose();
     super.dispose();
+  }
+
+  String get _primaryExpr {
+    if (_fractionMode) {
+      final n = _numController.text.trim();
+      final d = _denController.text.trim();
+      if (n.isNotEmpty && d.isNotEmpty) return '($n)/($d)';
+    }
+    return _exprCtrls.isNotEmpty ? _exprCtrls.first.text.trim() : '';
+  }
+
+  /// Remplace a,b,c par les valeurs des curseurs
+  String _withParams(String expr) {
+    var s = MathLibrary.normalizeExpression(expr);
+    // Eviter de remplacer dans sin, cos, tan, abs, etc.
+    s = s.replaceAllMapped(RegExp(r'(?<![a-z])a(?![a-z])'), (_) => '($_a)');
+    s = s.replaceAllMapped(RegExp(r'(?<![a-z])b(?![a-z])'), (_) => '($_b)');
+    s = s.replaceAllMapped(RegExp(r'(?<![a-z])c(?![a-z])'), (_) => '($_c)');
+    return s;
+  }
+
+  void _detectSliders(String expr) {
+    final n = MathLibrary.normalizeExpression(expr);
+    final hasA = RegExp(r'(?<![a-z])a(?![a-z])').hasMatch(n);
+    final hasB = RegExp(r'(?<![a-z])b(?![a-z])').hasMatch(n);
+    final hasC = RegExp(r'(?<![a-z])c(?![a-z])').hasMatch(n);
+    setState(() => _showSliders = hasA || hasB || hasC);
+  }
+
+  void _addExpression() {
+    if (_exprCtrls.length >= 5) return;
+    setState(() {
+      _exprCtrls.add(TextEditingController(text: ''));
+      _exprVisible.add(true);
+    });
+  }
+
+  void _removeExpression(int i) {
+    if (_exprCtrls.length <= 1) return;
+    setState(() {
+      _exprCtrls[i].dispose();
+      _exprCtrls.removeAt(i);
+      _exprVisible.removeAt(i);
+    });
+    _analyze();
   }
 
   void _loadExample() {
@@ -76,70 +145,76 @@ class _GraphScreenState extends State<GraphScreen>
       final ex = _examples[_exampleIndex % _examples.length];
       _exampleIndex++;
       _autoDomain = true;
-      if (ex.contains('/') &&
-          !ex.startsWith('ln') &&
-          !ex.startsWith('sin')) {
-        final parts = ex.split('/');
-        if (parts.length == 2) {
-          _fractionMode = true;
-          _numController.text =
-              parts[0].replaceAll('(', '').replaceAll(')', '');
-          _denController.text =
-              parts[1].replaceAll('(', '').replaceAll(')', '');
-          _funcController.text =
-              '(${_numController.text})/(${_denController.text})';
-        } else {
-          _fractionMode = false;
-          _funcController.text = ex;
-        }
-      } else {
-        _fractionMode = false;
-        _funcController.text = ex;
-      }
+      _fractionMode = false;
+      _exprCtrls.first.text = ex;
+      _detectSliders(ex);
     });
     _analyze();
   }
 
-  void _applyFraction() {
-    final n = _numController.text.trim();
-    final d = _denController.text.trim();
-    if (n.isEmpty || d.isEmpty) return;
-    _funcController.text = '($n)/($d)';
-  }
-
   Future<void> _analyze() async {
-    if (_fractionMode) _applyFraction();
     setState(() {
       _loading = true;
       _error = '';
+      _tracePixel = null;
+      _traceX = null;
+      _traceY = null;
     });
-    await Future.delayed(const Duration(milliseconds: 40));
-    final expr = _funcController.text.trim();
-    if (expr.isEmpty) {
+    await Future.delayed(const Duration(milliseconds: 30));
+
+    final exprs = <String>[];
+    if (_fractionMode) {
+      final e = _primaryExpr;
+      if (e.isEmpty) {
+        setState(() {
+          _error = 'Complete la fraction';
+          _loading = false;
+        });
+        return;
+      }
+      exprs.add(_withParams(e));
+    } else {
+      for (var i = 0; i < _exprCtrls.length; i++) {
+        if (!_exprVisible[i]) continue;
+        final t = _exprCtrls[i].text.trim();
+        if (t.isEmpty) continue;
+        exprs.add(_withParams(t));
+      }
+    }
+
+    if (exprs.isEmpty) {
       setState(() {
-        _error = 'Entre une fonction (ex: (2x+1)/ln(x-e))';
+        _error = 'Ajoute au moins une expression';
         _loading = false;
       });
       return;
     }
+
     try {
+      _detectSliders(exprs.join('+'));
+
       if (_autoDomain) {
-        final suggested = _engine.suggestDomain(expr);
+        final suggested = _engine.suggestDomain(exprs.first);
         _xMin = suggested.xMin;
         _xMax = suggested.xMax;
       }
-      final segments =
-          _graphService.evaluateSegments(expr, _xMin, _xMax, 900);
 
-      // Y depuis les points, puis ecretage asymptotes
+      final allSegs = <List<List<MapEntry<double, double>>>>[];
       var ymin = double.infinity;
       var ymax = -double.infinity;
-      for (final seg in segments) {
-        for (final p in seg) {
-          if (p.value < ymin) ymin = p.value;
-          if (p.value > ymax) ymax = p.value;
+
+      for (final expr in exprs) {
+        final segs =
+            _graphService.evaluateSegments(expr, _xMin, _xMax, 900);
+        allSegs.add(segs);
+        for (final seg in segs) {
+          for (final p in seg) {
+            if (p.value < ymin) ymin = p.value;
+            if (p.value > ymax) ymax = p.value;
+          }
         }
       }
+
       if (!ymin.isFinite || !ymax.isFinite) {
         ymin = -5;
         ymax = 5;
@@ -157,7 +232,7 @@ class _GraphScreenState extends State<GraphScreen>
         ymax = mid + 15;
       }
 
-      // Orthonorme : meme span X et Y (1 carreau = 1 unite = 1 cm)
+      // Orthonorme
       final xSpan = _xMax - _xMin;
       final ySpan = ymax - ymin;
       final span = math.max(xSpan, ySpan);
@@ -168,56 +243,68 @@ class _GraphScreenState extends State<GraphScreen>
       _yMin = yMid - span / 2;
       _yMax = yMid + span / 2;
 
-      // Recalcul points sur le domaine orthonorme
-      final segs2 =
-          _graphService.evaluateSegments(expr, _xMin, _xMax, 1000);
-      final study =
-          _analysisService.analyze(expr, xMin: _xMin, xMax: _xMax);
+      final allSegs2 = <List<List<MapEntry<double, double>>>>[];
+      for (final expr in exprs) {
+        allSegs2.add(
+            _graphService.evaluateSegments(expr, _xMin, _xMax, 1000));
+      }
+
+      final study = _analysisService.analyze(
+        exprs.first,
+        xMin: _xMin,
+        xMax: _xMax,
+      );
 
       setState(() {
-        _segments = segs2;
+        _allSegments = allSegs2;
         _study = study;
         _loading = false;
-        if (_segments.isEmpty) {
-          _error =
-              'Aucun point calculable. Verifie l expression et le domaine.';
+        if (allSegs2.every((s) => s.isEmpty)) {
+          _error = 'Aucun point calculable.';
         }
       });
     } catch (_) {
       setState(() {
         _error = 'Expression invalide';
         _loading = false;
-        _segments = [];
+        _allSegments = [];
         _study = null;
       });
     }
   }
 
-  Future<void> _exportLatex() async {
-    if (_study == null) return;
-    final latex = StringBuffer()
-      ..writeln(r'\documentclass{article}')
-      ..writeln(r'\usepackage{amsmath}')
-      ..writeln(r'\begin{document}')
-      ..writeln(r'\section*{Etude de fonction}')
-      ..writeln(r'\[ f(x) = ' + _study!.expression + r' \]')
-      ..writeln(r'\subsection*{Domaine}')
-      ..writeln(_study!.domain)
-      ..writeln(r'\end{document}');
-    await Share.share(latex.toString(), subject: 'etude_fonction.tex');
-  }
+  void _onTrace(Offset local, Size size) {
+    // Conversion pixel → coordonnees (meme logique que le painter)
+    const padL = 40.0, padR = 14.0, padT = 14.0, padB = 30.0;
+    final w = size.width - padL - padR;
+    final h = size.height - padT - padB;
+    if (w <= 0 || h <= 0) return;
+    final xSpan = (_xMax - _xMin).abs();
+    final ySpan = (_yMax - _yMin).abs();
+    final scale = math.min(w / xSpan, h / ySpan);
+    final usedW = xSpan * scale;
+    final usedH = ySpan * scale;
+    final ox = padL + (w - usedW) / 2;
+    final oy = padT + (h - usedH) / 2;
 
-  Future<void> _exportPng() async {
-    final renderObject = _chartKey.currentContext?.findRenderObject();
-    if (renderObject is! RenderRepaintBoundary) return;
-    final image = await renderObject.toImage(pixelRatio: 3.0);
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-    if (bytes == null) return;
-    await Share.shareXFiles([
-      XFile.fromData(bytes.buffer.asUint8List(),
-          mimeType: 'image/png', name: 'courbe.png'),
-    ]);
+    final x = _xMin + (local.dx - ox) / scale;
+    if (x < _xMin || x > _xMax) return;
+
+    final expr = _withParams(_primaryExpr);
+    final y = _engine.evaluate(expr, x);
+    if (y == null || !y.isFinite) {
+      setState(() {
+        _tracePixel = local;
+        _traceX = x;
+        _traceY = null;
+      });
+      return;
+    }
+    setState(() {
+      _tracePixel = local;
+      _traceX = x;
+      _traceY = MathLibrary.clean(y);
+    });
   }
 
   Future<void> _exportPdf() async {
@@ -255,6 +342,19 @@ class _GraphScreenState extends State<GraphScreen>
     }
   }
 
+  Future<void> _exportPng() async {
+    final ro = _chartKey.currentContext?.findRenderObject();
+    if (ro is! RenderRepaintBoundary) return;
+    final image = await ro.toImage(pixelRatio: 3.0);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (bytes == null) return;
+    await Share.shareXFiles([
+      XFile.fromData(bytes.buffer.asUint8List(),
+          mimeType: 'image/png', name: 'courbe.png'),
+    ]);
+  }
+
   void _showExportMenu() {
     showModalBottomSheet(
       context: context,
@@ -278,14 +378,6 @@ class _GraphScreenState extends State<GraphScreen>
                 _exportPng();
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('Exporter LaTeX'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _exportLatex();
-              },
-            ),
           ],
         ),
       ),
@@ -294,18 +386,19 @@ class _GraphScreenState extends State<GraphScreen>
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Etude de fonction'),
+        title: const Text('Graphique'),
         actions: [
+          IconButton(
+            tooltip: _desmosLight ? 'Grille sombre' : 'Grille Desmos claire',
+            icon: Icon(_desmosLight ? Icons.dark_mode : Icons.light_mode),
+            onPressed: () => setState(() => _desmosLight = !_desmosLight),
+          ),
           TextButton(onPressed: _loadExample, child: const Text('Exemple')),
           if (_study != null)
             IconButton(
-              icon: const Icon(Icons.ios_share),
-              onPressed: _showExportMenu,
-            ),
+                icon: const Icon(Icons.ios_share), onPressed: _showExportMenu),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -317,40 +410,110 @@ class _GraphScreenState extends State<GraphScreen>
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Row(
-              children: [
-                FilterChip(
-                  label: const Text('Fraction'),
-                  selected: _fractionMode,
-                  avatar: const Icon(Icons.horizontal_rule, size: 18),
-                  onSelected: (v) => setState(() {
-                    _fractionMode = v;
-                    if (v && _numController.text.isEmpty) {
-                      _numController.text = '2x+1';
-                      _denController.text = 'ln(x-e)';
-                      _applyFraction();
-                    }
-                  }),
-                ),
-              ],
+          // Liste d'expressions style Desmos
+          if (!_fractionMode)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 160),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _exprCtrls.length,
+                itemBuilder: (ctx, i) {
+                  final color = _desmosColors[i % _desmosColors.length];
+                  return Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() => _exprVisible[i] = !_exprVisible[i]);
+                            _analyze();
+                          },
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: _exprVisible[i]
+                                  ? color
+                                  : Colors.transparent,
+                              border: Border.all(color: color, width: 2),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _exprCtrls[i],
+                            decoration: InputDecoration(
+                              hintText: i == 0
+                                  ? 'f(x) = sin(x)  ou  a*x^2+b*x+c'
+                                  : 'autre expression',
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                            ),
+                            onSubmitted: (_) => _analyze(),
+                            onChanged: (v) {
+                              if (i == 0) _detectSliders(v);
+                            },
+                          ),
+                        ),
+                        if (_exprCtrls.length > 1)
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => _removeExpression(i),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
+          if (!_fractionMode)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: _addExpression,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Expression'),
+                  ),
+                  FilterChip(
+                    label: const Text('Fraction'),
+                    selected: _fractionMode,
+                    onSelected: (v) => setState(() => _fractionMode = v),
+                  ),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: _loading ? null : _analyze,
+                    child: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Tracer'),
+                  ),
+                ],
+              ),
+            ),
+
+          // Mode fraction
           if (_fractionMode)
             Padding(
-              padding: const EdgeInsets.fromLTRB(32, 10, 32, 4),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
               child: Column(
                 children: [
-                  // Style fraction centree
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                          color: primary.withOpacity(0.35), width: 1.2),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _desmosColors[0], width: 1.2),
                     ),
                     child: Column(
                       children: [
@@ -358,118 +521,79 @@ class _GraphScreenState extends State<GraphScreen>
                           controller: _numController,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.w600),
+                              fontSize: 20, fontWeight: FontWeight.w600),
                           decoration: const InputDecoration(
-                            hintText: 'numerateur',
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
-                          onChanged: (_) => setState(_applyFraction),
+                              hintText: 'numerateur',
+                              border: InputBorder.none,
+                              isDense: true),
                           onSubmitted: (_) => _analyze(),
                         ),
                         Container(
-                          height: 2.5,
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          color: primary,
-                        ),
+                            height: 2.5,
+                            color: _desmosColors[0],
+                            margin: const EdgeInsets.symmetric(vertical: 2)),
                         TextField(
                           controller: _denController,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.w600),
+                              fontSize: 20, fontWeight: FontWeight.w600),
                           decoration: const InputDecoration(
-                            hintText: 'denominateur',
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
-                          onChanged: (_) => setState(_applyFraction),
+                              hintText: 'denominateur',
+                              border: InputBorder.none,
+                              isDense: true),
                           onSubmitted: (_) => _analyze(),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    'f(x) = ${_funcController.text}',
-                    style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _funcController,
-                      decoration: InputDecoration(
-                        labelText: 'f(x) =',
-                        hintText: 'ex: (2x+1)/ln(x-e)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        filled: true,
-                      ),
-                      onSubmitted: (_) => _analyze(),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
                   FilledButton(
-                    onPressed: _loading ? null : _analyze,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _loading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.play_arrow_rounded),
-                  ),
+                      onPressed: _analyze, child: const Text('Analyser')),
                 ],
               ),
             ),
-          if (_fractionMode)
+
+          // Curseurs a, b, c (Desmos)
+          if (_showSliders)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: FilledButton(
-                onPressed: _loading ? null : _analyze,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Analyser'),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  _sliderRow('a', _a, -5, 5, (v) {
+                    setState(() => _a = v);
+                    _analyze();
+                  }),
+                  _sliderRow('b', _b, -5, 5, (v) {
+                    setState(() => _b = v);
+                    _analyze();
+                  }),
+                  _sliderRow('c', _c, -5, 5, (v) {
+                    setState(() => _c = v);
+                    _analyze();
+                  }),
+                ],
               ),
             ),
+
+          // Zoom
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Row(
               children: [
                 _zoomBtn('-', () {
                   setState(() {
                     _autoDomain = false;
-                    _xMin -= 3;
-                    _xMax += 3;
+                    final mid = (_xMin + _xMax) / 2;
+                    final half = (_xMax - _xMin) / 2 * 1.4;
+                    _xMin = mid - half;
+                    _xMax = mid + half;
                     final midY = (_yMin + _yMax) / 2;
-                    final half = (_xMax - _xMin) / 2;
                     _yMin = midY - half;
                     _yMax = midY + half;
                   });
                   _analyze();
                 }),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _zoomBtn('Reset', () {
                   setState(() {
                     _autoDomain = true;
@@ -480,7 +604,7 @@ class _GraphScreenState extends State<GraphScreen>
                   });
                   _analyze();
                 }),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _zoomBtn('+', () {
                   setState(() {
                     _autoDomain = false;
@@ -497,24 +621,66 @@ class _GraphScreenState extends State<GraphScreen>
               ],
             ),
           ),
+
+          // Trace readout
+          if (_traceX != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                _traceY != null
+                    ? 'x ≈ ${_fmt(_traceX!)}   y ≈ ${_fmt(_traceY!)}'
+                    : 'x ≈ ${_fmt(_traceX!)}   (hors domaine)',
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).primaryColor),
+              ),
+            ),
+
           if (_error.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               child: Text(_error,
                   style: const TextStyle(color: Colors.red),
                   textAlign: TextAlign.center),
             ),
+
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildChart(primary),
+                _buildChart(),
                 _buildStudy(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _sliderRow(
+      String name, double value, double min, double max, ValueChanged<double> onChanged) {
+    return Row(
+      children: [
+        SizedBox(
+            width: 24,
+            child: Text(name,
+                style: const TextStyle(fontWeight: FontWeight.bold))),
+        Expanded(
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            divisions: 100,
+            label: value.toStringAsFixed(2),
+            onChanged: onChanged,
+          ),
+        ),
+        SizedBox(
+            width: 44,
+            child: Text(value.toStringAsFixed(2),
+                style: const TextStyle(fontSize: 12))),
+      ],
     );
   }
 
@@ -525,30 +691,43 @@ class _GraphScreenState extends State<GraphScreen>
         style: OutlinedButton.styleFrom(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          padding: const EdgeInsets.symmetric(vertical: 8),
         ),
         child: Text(label),
       ),
     );
   }
 
-  Widget _buildChart(Color primary) {
-    if (_segments.isEmpty) {
+  Widget _buildChart() {
+    if (_allSegments.isEmpty || _allSegments.every((s) => s.isEmpty)) {
       return const Center(child: Text('Aucune courbe'));
     }
     return RepaintBoundary(
       key: _chartKey,
       child: Padding(
         padding: const EdgeInsets.all(8),
-        child: CustomPaint(
-          painter: _OrthonormalPainter(
-            segments: _segments,
-            xMin: _xMin,
-            xMax: _xMax,
-            yMin: _yMin,
-            yMax: _yMax,
-            curveColor: primary,
-          ),
-          child: const SizedBox.expand(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, constraints.maxHeight);
+            return GestureDetector(
+              onPanUpdate: (d) => _onTrace(d.localPosition, size),
+              onTapDown: (d) => _onTrace(d.localPosition, size),
+              child: CustomPaint(
+                painter: _DesmosPainter(
+                  allSegments: _allSegments,
+                  xMin: _xMin,
+                  xMax: _xMax,
+                  yMin: _yMin,
+                  yMax: _yMax,
+                  light: _desmosLight,
+                  colors: _desmosColors,
+                  traceX: _traceX,
+                  traceY: _traceY,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -576,12 +755,7 @@ class _GraphScreenState extends State<GraphScreen>
         FilledButton.icon(
           onPressed: _showExportMenu,
           icon: const Icon(Icons.ios_share),
-          label: const Text('Exporter (PDF / PNG / LaTeX)'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
-          ),
+          label: const Text('Exporter'),
         ),
         const SizedBox(height: 30),
       ],
@@ -636,22 +810,32 @@ class _GraphScreenState extends State<GraphScreen>
       ),
     );
   }
+
+  String _fmt(double v) {
+    if (v.abs() < 1e-9) return '0';
+    if (v == v.roundToDouble()) return v.toInt().toString();
+    return v.toStringAsFixed(3);
+  }
 }
 
-/// Repere orthonorme type papier millimetre / Desmos :
-/// meme echelle X/Y, grille fine + principale, axes gradues.
-class _OrthonormalPainter extends CustomPainter {
-  final List<List<MapEntry<double, double>>> segments;
+/// Grille orthonorme style Desmos (claire ou sombre)
+class _DesmosPainter extends CustomPainter {
+  final List<List<List<MapEntry<double, double>>>> allSegments;
   final double xMin, xMax, yMin, yMax;
-  final Color curveColor;
+  final bool light;
+  final List<Color> colors;
+  final double? traceX, traceY;
 
-  _OrthonormalPainter({
-    required this.segments,
+  _DesmosPainter({
+    required this.allSegments,
     required this.xMin,
     required this.xMax,
     required this.yMin,
     required this.yMax,
-    required this.curveColor,
+    required this.light,
+    required this.colors,
+    this.traceX,
+    this.traceY,
   });
 
   @override
@@ -665,7 +849,6 @@ class _OrthonormalPainter extends CustomPainter {
     final ySpan = (yMax - yMin).abs();
     if (xSpan < 1e-12 || ySpan < 1e-12) return;
 
-    // Orthonorme : meme pixels / unite
     final scale = math.min(w / xSpan, h / ySpan);
     final usedW = xSpan * scale;
     final usedH = ySpan * scale;
@@ -675,27 +858,35 @@ class _OrthonormalPainter extends CustomPainter {
     double toPx(double x) => ox + (x - xMin) * scale;
     double toPy(double y) => oy + usedH - (y - yMin) * scale;
 
-    // Fond style Desmos dark
-    final bg = Paint()..color = const Color(0xFF0B1220);
+    // Fond Desmos
+    final bgColor = light ? const Color(0xFFF7F7F7) : const Color(0xFF0B1220);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(0, 0, size.width, size.height),
         const Radius.circular(12),
       ),
-      bg,
+      Paint()..color = bgColor,
     );
 
-    final gridMinor = Paint()
-      ..color = const Color(0xFF1A2740)
-      ..strokeWidth = 0.6;
-    final gridMajor = Paint()
-      ..color = const Color(0xFF2C3E5A)
-      ..strokeWidth = 1.1;
-    final axisPaint = Paint()
-      ..color = const Color(0xFFB8C5D6)
-      ..strokeWidth = 1.6;
+    final minorColor =
+        light ? const Color(0xFFE0E0E0) : const Color(0xFF1A2740);
+    final majorColor =
+        light ? const Color(0xFFC8C8C8) : const Color(0xFF2C3E5A);
+    final axisColor =
+        light ? const Color(0xFF2C2C2C) : const Color(0xFFB8C5D6);
+    final labelColor =
+        light ? const Color(0xFF555555) : const Color(0xFF9BB0C9);
 
-    // Pas type "cm" : 1 unite principale, 0.2 secondaire
+    final gridMinor = Paint()
+      ..color = minorColor
+      ..strokeWidth = 0.7;
+    final gridMajor = Paint()
+      ..color = majorColor
+      ..strokeWidth = 1.15;
+    final axisPaint = Paint()
+      ..color = axisColor
+      ..strokeWidth = 1.7;
+
     final stepMajor = _niceStep(math.min(xSpan, ySpan) / 8);
     final stepMinor = stepMajor / 5;
 
@@ -718,25 +909,21 @@ class _OrthonormalPainter extends CustomPainter {
       );
     }
 
-    // Axes
     if (xMin <= 0 && xMax >= 0) {
-      final px = toPx(0);
-      canvas.drawLine(Offset(px, oy), Offset(px, oy + usedH), axisPaint);
+      canvas.drawLine(
+          Offset(toPx(0), oy), Offset(toPx(0), oy + usedH), axisPaint);
     }
     if (yMin <= 0 && yMax >= 0) {
-      final py = toPy(0);
-      canvas.drawLine(Offset(ox, py), Offset(ox + usedW, py), axisPaint);
+      canvas.drawLine(
+          Offset(ox, toPy(0)), Offset(ox + usedW, toPy(0)), axisPaint);
     }
 
-    // Labels
     final tp = TextPainter(textDirection: TextDirection.ltr);
     for (var x = _floorTo(xMin, stepMajor); x <= xMax + 1e-9; x += stepMajor) {
       if (x.abs() < stepMajor * 0.01) continue;
       final px = toPx(x);
       tp.text = TextSpan(
-        text: _fmt(x),
-        style: const TextStyle(color: Color(0xFF9BB0C9), fontSize: 10),
-      );
+          text: _fmt(x), style: TextStyle(color: labelColor, fontSize: 10));
       tp.layout();
       tp.paint(canvas, Offset(px - tp.width / 2, oy + usedH + 4));
     }
@@ -744,52 +931,70 @@ class _OrthonormalPainter extends CustomPainter {
       if (y.abs() < stepMajor * 0.01) continue;
       final py = toPy(y);
       tp.text = TextSpan(
-        text: _fmt(y),
-        style: const TextStyle(color: Color(0xFF9BB0C9), fontSize: 10),
-      );
+          text: _fmt(y), style: TextStyle(color: labelColor, fontSize: 10));
       tp.layout();
       tp.paint(canvas, Offset(ox - tp.width - 6, py - tp.height / 2));
     }
 
-    // Courbes par segments
-    final curve = Paint()
-      ..color = curveColor
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
-
-    for (final seg in segments) {
-      if (seg.length < 2) continue;
-      final path = Path();
-      path.moveTo(toPx(seg.first.key), toPy(seg.first.value));
-      for (var i = 1; i < seg.length; i++) {
-        path.lineTo(toPx(seg[i].key), toPy(seg[i].value));
+    // Courbes multi-couleurs
+    for (var i = 0; i < allSegments.length; i++) {
+      final color = colors[i % colors.length];
+      final curve = Paint()
+        ..color = color
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..isAntiAlias = true;
+      for (final seg in allSegments[i]) {
+        if (seg.length < 2) continue;
+        final path = Path();
+        path.moveTo(toPx(seg.first.key), toPy(seg.first.value));
+        for (var j = 1; j < seg.length; j++) {
+          path.lineTo(toPx(seg[j].key), toPy(seg[j].value));
+        }
+        canvas.drawPath(path, curve);
       }
-      canvas.drawPath(path, curve);
     }
 
-    final border = Paint()
-      ..color = const Color(0xFF3A4A66)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    canvas.drawRect(Rect.fromLTWH(ox, oy, usedW, usedH), border);
+    // Trace interactive (croix + point)
+    if (traceX != null && traceY != null) {
+      final px = toPx(traceX!);
+      final py = toPy(traceY!);
+      final cross = Paint()
+        ..color = colors[0].withOpacity(0.5)
+        ..strokeWidth = 1;
+      canvas.drawLine(Offset(px, oy), Offset(px, oy + usedH), cross);
+      canvas.drawLine(Offset(ox, py), Offset(ox + usedW, py), cross);
+      canvas.drawCircle(Offset(px, py), 5, Paint()..color = colors[0]);
+      canvas.drawCircle(
+          Offset(px, py),
+          5,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5);
+    }
+
+    canvas.drawRect(
+      Rect.fromLTWH(ox, oy, usedW, usedH),
+      Paint()
+        ..color = light ? const Color(0xFFAAAAAA) : const Color(0xFF3A4A66)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
   }
 
   double _niceStep(double rough) {
     if (rough <= 0) return 1;
     final exp = (math.log(rough) / math.ln10).floor();
     final f = rough / math.pow(10.0, exp);
-    double nf;
-    if (f < 1.5) {
-      nf = 1;
-    } else if (f < 3) {
-      nf = 2;
-    } else if (f < 7) {
-      nf = 5;
-    } else {
-      nf = 10;
-    }
+    final nf = f < 1.5
+        ? 1.0
+        : f < 3
+            ? 2.0
+            : f < 7
+                ? 5.0
+                : 10.0;
     return nf * math.pow(10.0, exp).toDouble();
   }
 
@@ -807,11 +1012,5 @@ class _OrthonormalPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _OrthonormalPainter old) =>
-      old.segments != segments ||
-      old.xMin != xMin ||
-      old.xMax != xMax ||
-      old.yMin != yMin ||
-      old.yMax != yMax ||
-      old.curveColor != curveColor;
+  bool shouldRepaint(covariant _DesmosPainter old) => true;
 }

@@ -1,4 +1,5 @@
 import '../models/complex_number.dart';
+import 'math_library.dart';
 
 /// Service pour les opérations sur nombres complexes
 class ComplexService {
@@ -22,7 +23,8 @@ class ComplexService {
       }
 
       // Forme a+bi ou a-bi
-      final match = RegExp(r'^([+-]?\d*\.?\d+)([+-]\d*\.?\d*)i$').firstMatch(input);
+      final match =
+          RegExp(r'^([+-]?\d*\.?\d+)([+-]\d*\.?\d*)i$').firstMatch(input);
       if (match != null) {
         double real = double.parse(match.group(1)!);
         String imagStr = match.group(2)!;
@@ -42,7 +44,8 @@ class ComplexService {
   ComplexNumber multiply(ComplexNumber a, ComplexNumber b) => a * b;
   ComplexNumber divide(ComplexNumber a, ComplexNumber b) => a / b;
 
-  String modulus(ComplexNumber c) => c.modulus.toStringAsFixed(6);
-  String argument(ComplexNumber c) => (c.argument * 180 / 3.1415926535).toStringAsFixed(4) + '°';
+  String modulus(ComplexNumber c) => MathLibrary.format(c.modulus);
+  String argument(ComplexNumber c) =>
+      MathLibrary.format(c.argument * 180 / 3.1415926535) + '°';
   ComplexNumber conjugate(ComplexNumber c) => c.conjugate;
 }

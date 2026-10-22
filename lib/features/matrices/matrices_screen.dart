@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../data/services/math_library.dart';
 
 /// Module Matrices : opérations de base + déterminant + inverse (2x2 et 3x3)
 class MatricesScreen extends StatefulWidget {
@@ -24,8 +25,10 @@ class _MatricesScreenState extends State<MatricesScreen> {
   }
 
   void _initControllers() {
-    _aControllers = List.generate(_size, (_) => List.generate(_size, (_) => TextEditingController(text: '0')));
-    _bControllers = List.generate(_size, (_) => List.generate(_size, (_) => TextEditingController(text: '0')));
+    _aControllers = List.generate(_size,
+        (_) => List.generate(_size, (_) => TextEditingController(text: '0')));
+    _bControllers = List.generate(_size,
+        (_) => List.generate(_size, (_) => TextEditingController(text: '0')));
   }
 
   @override
@@ -40,7 +43,11 @@ class _MatricesScreenState extends State<MatricesScreen> {
   }
 
   List<List<double>> _readMatrix(List<List<TextEditingController>> ctrls) {
-    return ctrls.map((row) => row.map((c) => double.tryParse(c.text.replaceAll(',', '.')) ?? 0.0).toList()).toList();
+    return ctrls
+        .map((row) => row
+            .map((c) => double.tryParse(c.text.replaceAll(',', '.')) ?? 0.0)
+            .toList())
+        .toList();
   }
 
   void _calculate() {
@@ -52,9 +59,11 @@ class _MatricesScreenState extends State<MatricesScreen> {
       final isAdd = _operation == 'addition';
       buffer.writeln(isAdd ? 'Opération : A + B' : 'Opération : A − B');
       buffer.writeln();
-      final R = List.generate(_size, (i) => List.generate(_size, (j) {
-            return isAdd ? A[i][j] + B[i][j] : A[i][j] - B[i][j];
-          }));
+      final R = List.generate(
+          _size,
+          (i) => List.generate(_size, (j) {
+                return isAdd ? A[i][j] + B[i][j] : A[i][j] - B[i][j];
+              }));
       buffer.writeln('Résultat :');
       buffer.writeln(_formatMatrix(R));
       setState(() {
@@ -65,13 +74,15 @@ class _MatricesScreenState extends State<MatricesScreen> {
       buffer.writeln('Opération : A × B');
       buffer.writeln('Chaque élément (i,j) = somme de A[i][k] × B[k][j]');
       buffer.writeln();
-      final R = List.generate(_size, (i) => List.generate(_size, (j) {
-            double sum = 0;
-            for (int k = 0; k < _size; k++) {
-              sum += A[i][k] * B[k][j];
-            }
-            return sum;
-          }));
+      final R = List.generate(
+          _size,
+          (i) => List.generate(_size, (j) {
+                double sum = 0;
+                for (int k = 0; k < _size; k++) {
+                  sum += A[i][k] * B[k][j];
+                }
+                return sum;
+              }));
       buffer.writeln('Résultat :');
       buffer.writeln(_formatMatrix(R));
       setState(() {
@@ -83,13 +94,14 @@ class _MatricesScreenState extends State<MatricesScreen> {
       buffer.writeln('Calcul du déterminant de A');
       if (_size == 2) {
         buffer.writeln('Formule 2×2 : a11·a22 − a12·a21');
-        buffer.writeln('${A[0][0]} × ${A[1][1]} − ${A[0][1]} × ${A[1][0]} = $det');
+        buffer.writeln(
+            '${A[0][0]} × ${A[1][1]} − ${A[0][1]} × ${A[1][0]} = $det');
       } else {
         buffer.writeln('Formule de Sarrus / développement (3×3)');
         buffer.writeln('det(A) = $det');
       }
       setState(() {
-        _result = 'det(A) = ${det.toStringAsFixed(6)}';
+        _result = 'det(A) = ${MathLibrary.format(det)}';
         _steps = buffer.toString();
       });
     } else if (_operation == 'inverse') {
@@ -149,7 +161,9 @@ class _MatricesScreenState extends State<MatricesScreen> {
   }
 
   String _formatMatrix(List<List<double>> m) {
-    return m.map((row) => row.map((v) => v.toStringAsFixed(4)).join('  ')).join('\n');
+    return m
+        .map((row) => row.map((v) => MathLibrary.format(v)).join('  '))
+        .join('\n');
   }
 
   Widget _matrixInput(String title, List<List<TextEditingController>> ctrls) {
@@ -166,10 +180,12 @@ class _MatricesScreenState extends State<MatricesScreen> {
                   padding: const EdgeInsets.all(3),
                   child: TextField(
                     controller: ctrls[i][j],
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true, signed: true),
                     textAlign: TextAlign.center,
                     decoration: InputDecoration(
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
@@ -229,7 +245,9 @@ class _MatricesScreenState extends State<MatricesScreen> {
           ),
           const SizedBox(height: 20),
           _matrixInput('Matrice A', _aControllers),
-          if (_operation == 'addition' || _operation == 'soustraction' || _operation == 'multiplication') ...[
+          if (_operation == 'addition' ||
+              _operation == 'soustraction' ||
+              _operation == 'multiplication') ...[
             const SizedBox(height: 16),
             _matrixInput('Matrice B', _bControllers),
           ],
@@ -238,31 +256,39 @@ class _MatricesScreenState extends State<MatricesScreen> {
             onPressed: _calculate,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text('Calculer'),
           ),
           if (_result.isNotEmpty) ...[
             const SizedBox(height: 20),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    const Text('Résultat', style: TextStyle(color: Colors.grey)),
+                    const Text('Résultat',
+                        style: TextStyle(color: Colors.grey)),
                     const SizedBox(height: 8),
-                    Text(_result, style: const TextStyle(fontFamily: 'monospace', fontSize: 16, height: 1.5), textAlign: TextAlign.center),
+                    Text(_result,
+                        style: const TextStyle(
+                            fontFamily: 'monospace', fontSize: 16, height: 1.5),
+                        textAlign: TextAlign.center),
                   ],
                 ),
               ),
             ).animate().fadeIn(),
             const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(_steps, style: const TextStyle(height: 1.4, fontSize: 13)),
+                child: Text(_steps,
+                    style: const TextStyle(height: 1.4, fontSize: 13)),
               ),
             ).animate().fadeIn(delay: 80.ms),
           ],

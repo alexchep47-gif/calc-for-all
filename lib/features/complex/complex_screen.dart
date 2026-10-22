@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/models/complex_number.dart';
 import '../../data/services/complex_service.dart';
+import '../../data/services/math_library.dart';
 import '../../widgets/custom_button.dart';
 
 /// Nombres complexes + représentation sur le plan complexe
@@ -95,13 +96,12 @@ class _ComplexScreenState extends State<ComplexScreen> {
             _pointResult = r;
             break;
           case '|z|':
-            _result = a.modulus.toStringAsFixed(6);
+            _result = MathLibrary.format(a.modulus);
             _extra = 'Module de A';
             _pointResult = a;
             break;
           case 'arg':
-            _result =
-                '${(a.argument * 180 / math.pi).toStringAsFixed(4)}°';
+            _result = '${MathLibrary.format(a.argument * 180 / math.pi)}°';
             _extra = 'Argument de A';
             _pointResult = a;
             break;

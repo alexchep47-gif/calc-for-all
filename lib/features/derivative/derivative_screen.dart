@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/services/math_expression_engine.dart';
+import '../../data/services/math_library.dart';
 
 /// Module Dérivée & Intégrale (symbolique hors-ligne + calcul numérique optionnel).
 class DerivativeScreen extends StatefulWidget {
@@ -68,7 +69,7 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
         final value = x0 == null ? null : _engine.evaluate(symbolic, x0);
         if (value != null) {
           _numericResult =
-              'f′(${_xController.text.trim()}) = ${value.toStringAsFixed(6)}';
+              'f′(${_xController.text.trim()}) = ${MathLibrary.format(value)}';
           buffer.writeln(_numericResult);
         } else {
           _numericResult = 'Valeur de x hors du domaine de définition';
@@ -123,10 +124,10 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
       buffer.writeln('Méthode : trapèzes (n = $n subdivisions)');
       buffer.writeln('∫ₐᵇ f(x) dx ≈ (h/2) · [f(a) + 2Σf(xi) + f(b)]');
       buffer.writeln();
-      buffer.writeln('Résultat approximatif : ${integral.toStringAsFixed(6)}');
+      buffer.writeln('Résultat approximatif : ${MathLibrary.format(integral)}');
 
       setState(() {
-        _result = '∫ ≈ ${integral.toStringAsFixed(6)}';
+        _result = '∫ ≈ ${MathLibrary.format(integral)}';
         _steps = buffer.toString();
       });
     }

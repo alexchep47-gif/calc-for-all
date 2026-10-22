@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
+import '../../data/services/math_library.dart';
 
 /// Cercle trigonometrique — angles en fractions de pi
 class UnitCircleScreen extends StatefulWidget {
@@ -40,7 +41,7 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
       }
     }
     if (bestErr > 0.02) {
-      return '${ratio.toStringAsFixed(3)} π';
+      return '${MathLibrary.format(ratio)} π';
     }
     // Simplifie bestP/bestQ
     final g = _gcd(bestP, bestQ);
@@ -154,7 +155,7 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
                 ),
                 if (!_useDegrees)
                   Text(
-                    '(≈ ${_angleRad.toStringAsFixed(4)} rad)',
+                    '(≈ ${MathLibrary.format(_angleRad)} rad)',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 Slider(
@@ -171,12 +172,24 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    for (final d in [0, 30, 45, 60, 90, 120, 150, 180, 270, 360])
+                    for (final d in [
+                      0,
+                      30,
+                      45,
+                      60,
+                      90,
+                      120,
+                      150,
+                      180,
+                      270,
+                      360
+                    ])
                       ActionChip(
                         label: Text(_useDegrees
                             ? '$d°'
                             : _radToPiFraction(d * math.pi / 180)),
-                        onPressed: () => setState(() => _angleDeg = d.toDouble()),
+                        onPressed: () =>
+                            setState(() => _angleDeg = d.toDouble()),
                       ),
                   ],
                 ),
@@ -184,22 +197,20 @@ class _UnitCircleScreenState extends State<UnitCircleScreen> {
                 _infoCard(
                   'cos(θ)',
                   cosExact.isNotEmpty
-                      ? '$cosExact  (≈ ${cosVal.toStringAsFixed(4)})'
-                      : cosVal.toStringAsFixed(6),
+                      ? '$cosExact  (≈ ${MathLibrary.format(cosVal)})'
+                      : MathLibrary.format(cosVal),
                 ),
                 _infoCard(
                   'sin(θ)',
                   sinExact.isNotEmpty
-                      ? '$sinExact  (≈ ${sinVal.toStringAsFixed(4)})'
-                      : sinVal.toStringAsFixed(6),
+                      ? '$sinExact  (≈ ${MathLibrary.format(sinVal)})'
+                      : MathLibrary.format(sinVal),
                 ),
                 _infoCard(
                   'tan(θ)',
                   tanExact.isNotEmpty
                       ? tanExact
-                      : (tanVal.isInfinite
-                          ? '∞'
-                          : tanVal.toStringAsFixed(6)),
+                      : (tanVal.isInfinite ? '∞' : MathLibrary.format(tanVal)),
                 ),
               ],
             ),
@@ -239,8 +250,12 @@ class _UnitCirclePainter extends CustomPainter {
       ..color = Colors.blue.shade700
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
-    final pointPaint = Paint()..color = Colors.red..style = PaintingStyle.fill;
-    final linePaint = Paint()..color = Colors.red.shade300..strokeWidth = 2;
+    final pointPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+    final linePaint = Paint()
+      ..color = Colors.red.shade300
+      ..strokeWidth = 2;
 
     canvas.drawLine(
       Offset(center.dx - radius - 10, center.dy),

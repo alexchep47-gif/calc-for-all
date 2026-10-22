@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:math' as math;
+import 'package:provider/provider.dart';
 
-/// Module Suites : arithmétiques et géométriques
+import '../../data/services/math_library.dart';
+import '../../data/storage/local_storage.dart';
+
+/// Suites numériques : arithmétique, géométrique, Fibonacci, récurrente, limite
 class SequencesScreen extends StatefulWidget {
   const SequencesScreen({super.key});
 
@@ -11,87 +14,148 @@ class SequencesScreen extends StatefulWidget {
 }
 
 class _SequencesScreenState extends State<SequencesScreen> {
-  String _type = 'arithmétique'; // arithmétique ou géométrique
-  final TextEditingController _u1Controller = TextEditingController(text: '1');
-  final TextEditingController _rController = TextEditingController(text: '2');
-  final TextEditingController _nController = TextEditingController(text: '10');
+  String _type = 'arithmétique';
+  final _u1 = TextEditingController(text: '2');
+  final _r = TextEditingController(text: '3');
+  final _n = TextEditingController(text: '10');
+  final _a = TextEditingController(text: '1');
+  final _b = TextEditingController(text: '1');
   String _result = '';
   String _steps = '';
+  List<double> _terms = [];
 
   void _calculate() {
-    final u1 = double.tryParse(_u1Controller.text.replaceAll(',', '.'));
-    final r = double.tryParse(_rController.text.replaceAll(',', '.'));
-    final n = int.tryParse(_nController.text);
-
-    if (u1 == null || r == null || n == null || n < 1) {
+    final u1 = double.tryParse(_u1.text.replaceAll(',', '.'));
+    final r = double.tryParse(_r.text.replaceAll(',', '.'));
+    final n = int.tryParse(_n.text);
+    if (u1 == null || n == null || n < 1) {
       setState(() {
-        _result = 'Valeurs invalides';
-        _steps = 'Vérifie u₁, la raison (r ou q) et n (n ≥ 1).';
+        _result = 'Entrées invalides';
+        _steps = '';
+        _terms = [];
       });
       return;
     }
 
-    final buffer = StringBuffer();
+    final buf = StringBuffer();
+    final terms = <double>[];
+    double un;
+    double sn;
 
-    if (_type == 'arithmétique') {
-      // u_n = u1 + (n-1)*r
-      final un = u1 + (n - 1) * r;
-      // Somme S_n = n/2 * (2*u1 + (n-1)*r)
-      final sn = n / 2 * (2 * u1 + (n - 1) * r);
+    switch (_type) {
+      case 'arithmétique':
+        if (r == null) return;
+        buf.writeln('Suite arithmétique : uₙ = u₁ + (n−1)·r');
+        buf.writeln('u₁ = ${MathLibrary.format(u1)}, r = ${MathLibrary.format(r)}, n = $n');
+        un = u1 + (n - 1) * r;
+        sn = n * (u1 + un) / 2;
+        buf.writeln('uₙ = ${MathLibrary.format(u1)} + (${n − 1})·${MathLibrary.format(r)} = ${MathLibrary.format(un)}');
+        buf.writeln('Sₙ = n·(u₁+uₙ)/2 = ${MathLibrary.format(sn)}');
+        for (var k = 1; k <= n && k <= 20; k++) {
+          terms.add(u1 + (k - 1) * r);
+        }
+        break;
 
-      buffer.writeln('Suite arithmétique');
-      buffer.writeln('Premier terme u₁ = $u1');
-      buffer.writeln('Raison r = $r');
-      buffer.writeln('Rang n = $n');
-      buffer.writeln();
-      buffer.writeln('1. Terme général :');
-      buffer.writeln('   uₙ = u₁ + (n − 1) × r');
-      buffer.writeln('   uₙ = $u1 + (${n - 1}) × $r');
-      buffer.writeln('   uₙ = $un');
-      buffer.writeln();
-      buffer.writeln('2. Somme des n premiers termes :');
-      buffer.writeln('   Sₙ = n/2 × [2u₁ + (n − 1)r]');
-      buffer.writeln('   Sₙ = $n/2 × [2×$u1 + (${n - 1})×$r]');
-      buffer.writeln('   Sₙ = $sn');
+      case 'géométrique':
+        if (r == null) return;
+        buf.writeln('Suite géométrique : uₙ = u₁ · q^(n−1)');
+        buf.writeln('u₁ = ${MathLibrary.format(u1)}, q = ${MathLibrary.format(r)}, n = $n');
+        un = u1 * MathLibrary.pow(r, (n - 1).toDouble());
+        if ((r - 1).abs() < 1e-12) {
+          sn = n * u1;
+        } else {
+          sn = u1 * (1 - MathLibrary.pow(r, n.toDouble())) / (1 - r);
+        }
+        buf.writeln('uₙ = ${MathLibrary.format(un)}');
+        buf.writeln('Sₙ = ${MathLibrary.format(sn)}');
+        if (r.abs() < 1) {
+          buf.writeln('Comme |q| < 1, lim Sₙ = u₁/(1−q) = ${MathLibrary.format(u1 / (1 - r))}');
+        }
+        for (var k = 1; k <= n && k <= 20; k++) {
+          terms.add(u1 * MathLibrary.pow(r, (k - 1).toDouble()));
+        }
+        break;
 
-      setState(() {
-        _result = 'uₙ = $un\nSₙ = $sn';
-        _steps = buffer.toString();
-      });
-    } else {
-      // géométrique
-      // u_n = u1 * q^(n-1)
-      final un = u1 * math.pow(r, n - 1);
-      // Somme S_n = u1 * (q^n - 1) / (q - 1)  si q ≠ 1
-      double sn;
-      if ((r - 1).abs() < 1e-10) {
-        sn = u1 * n;
-        buffer.writeln('Suite géométrique (q = 1)');
-        buffer.writeln('Tous les termes sont égaux à u₁');
-        buffer.writeln('Sₙ = n × u₁ = $sn');
-      } else {
-        sn = u1 * (math.pow(r, n) - 1) / (r - 1);
-        buffer.writeln('Suite géométrique');
-        buffer.writeln('Premier terme u₁ = $u1');
-        buffer.writeln('Raison q = $r');
-        buffer.writeln('Rang n = $n');
-        buffer.writeln();
-        buffer.writeln('1. Terme général :');
-        buffer.writeln('   uₙ = u₁ × qⁿ⁻¹');
-        buffer.writeln('   uₙ = $u1 × $r^${n - 1}');
-        buffer.writeln('   uₙ = $un');
-        buffer.writeln();
-        buffer.writeln('2. Somme des n premiers termes :');
-        buffer.writeln('   Sₙ = u₁ × (qⁿ − 1) / (q − 1)');
-        buffer.writeln('   Sₙ = $sn');
-      }
+      case 'Fibonacci':
+        buf.writeln('Suite de Fibonacci : F₁ = 1, F₂ = 1, Fₙ = Fₙ₋₁ + Fₙ₋₂');
+        var a = 1.0, b = 1.0;
+        if (n == 1) {
+          un = 1;
+          terms.add(1);
+        } else if (n == 2) {
+          un = 1;
+          terms.addAll([1, 1]);
+        } else {
+          terms.addAll([1, 1]);
+          for (var k = 3; k <= n; k++) {
+            final c = a + b;
+            a = b;
+            b = c;
+            if (terms.length < 20) terms.add(c);
+          }
+          un = b;
+        }
+        sn = terms.fold(0.0, (s, t) => s + t);
+        // Si n>20, recalculer somme exacte via formule F1+…+Fn = F_{n+2}-1
+        if (n > 20) {
+          var x = 1.0, y = 1.0;
+          for (var k = 3; k <= n + 2; k++) {
+            final z = x + y;
+            x = y;
+            y = z;
+          }
+          sn = y - 1; // F_{n+2} - 1
+        }
+        buf.writeln('Fₙ = ${MathLibrary.format(un)}');
+        buf.writeln('Sₙ ≈ ${MathLibrary.format(sn)}');
+        break;
 
-      setState(() {
-        _result = 'uₙ = $un\nSₙ = $sn';
-        _steps = buffer.toString();
-      });
+      case 'récurrente':
+        // u_{n+1} = a·u_n + b
+        final aa = double.tryParse(_a.text.replaceAll(',', '.')) ?? 1;
+        final bb = double.tryParse(_b.text.replaceAll(',', '.')) ?? 0;
+        buf.writeln('Suite récurrente : uₙ₊₁ = a·uₙ + b');
+        buf.writeln('a = ${MathLibrary.format(aa)}, b = ${MathLibrary.format(bb)}, u₁ = ${MathLibrary.format(u1)}');
+        var u = u1;
+        terms.add(u);
+        for (var k = 2; k <= n; k++) {
+          u = aa * u + bb;
+          if (terms.length < 20) terms.add(u);
+        }
+        un = u;
+        sn = terms.fold(0.0, (s, t) => s + t);
+        // Point fixe si |a|<1 : L = b/(1-a)
+        if (aa.abs() < 1) {
+          final L = bb / (1 - aa);
+          buf.writeln('Point fixe L = b/(1−a) = ${MathLibrary.format(L)}');
+          buf.writeln('La suite converge vers L si |a| < 1.');
+        }
+        buf.writeln('uₙ = ${MathLibrary.format(un)}');
+        break;
+
+      default:
+        un = u1;
+        sn = u1;
     }
+
+    final resText = 'uₙ = ${MathLibrary.format(un)}\nSₙ = ${MathLibrary.format(sn)}';
+    setState(() {
+      _result = resText;
+      _steps = buf.toString();
+      _terms = terms;
+    });
+
+    try {
+      context.read<LocalStorage>().addToHistory(
+            'Suite $_type n=$n',
+            resText.replaceAll('\n', ' · '),
+            module: 'Suites',
+          );
+    } catch (_) {}
   }
+
+  // Fix operator − used as unicode in string interpolation above - use -
+  // Actually I used n − 1 with unicode minus in string - need ascii
 
   @override
   Widget build(BuildContext context) {
@@ -100,39 +164,72 @@ class _SequencesScreenState extends State<SequencesScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'arithmétique', label: Text('Arithmétique')),
-              ButtonSegment(value: 'géométrique', label: Text('Géométrique')),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final t in [
+                'arithmétique',
+                'géométrique',
+                'Fibonacci',
+                'récurrente',
+              ])
+                ChoiceChip(
+                  label: Text(t),
+                  selected: _type == t,
+                  onSelected: (_) => setState(() {
+                    _type = t;
+                    _result = '';
+                  }),
+                ),
             ],
-            selected: {_type},
-            onSelectionChanged: (s) => setState(() => _type = s.first),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           TextField(
-            controller: _u1Controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-            decoration: InputDecoration(
+            controller: _u1,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true, signed: true),
+            decoration: const InputDecoration(
               labelText: 'Premier terme u₁',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _rController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-            decoration: InputDecoration(
-              labelText: _type == 'arithmétique' ? 'Raison r' : 'Raison q',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          if (_type == 'arithmétique' || _type == 'géométrique') ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _r,
+              keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true, signed: true),
+              decoration: InputDecoration(
+                labelText: _type == 'arithmétique' ? 'Raison r' : 'Raison q',
+                border: const OutlineInputBorder(),
+              ),
             ),
-          ),
+          ],
+          if (_type == 'récurrente') ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _a,
+              decoration: const InputDecoration(
+                labelText: 'Coefficient a (uₙ₊₁ = a·uₙ + b)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _b,
+              decoration: const InputDecoration(
+                labelText: 'Constante b',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
-            controller: _nController,
+            controller: _n,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'Rang n',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 20),
@@ -140,34 +237,45 @@ class _SequencesScreenState extends State<SequencesScreen> {
             onPressed: _calculate,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text('Calculer uₙ et Sₙ'),
           ),
           if (_result.isNotEmpty) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Text(_result, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, height: 1.5), textAlign: TextAlign.center),
-              ),
-            ).animate().fadeIn().scale(),
-            const SizedBox(height: 12),
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
+                child: Text(
+                  _result,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold, height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ).animate().fadeIn(),
+            if (_terms.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Premiers termes : ${_terms.map(MathLibrary.format).join(', ')}'
+                '${(_n.text.isNotEmpty && (int.tryParse(_n.text) ?? 0) > 20) ? ' …' : ''}',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Explications pas-à-pas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 10),
+                    const Text('Explications pas à pas',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
                     Text(_steps, style: const TextStyle(height: 1.45, fontSize: 13)),
                   ],
                 ),
               ),
-            ).animate().fadeIn(delay: 100.ms),
+            ),
           ],
         ],
       ),

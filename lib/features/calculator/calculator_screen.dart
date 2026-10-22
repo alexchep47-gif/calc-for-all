@@ -5,9 +5,8 @@ import '../../core/routes/app_routes.dart';
 import '../../data/services/calculator_service.dart';
 import '../../data/services/math_library.dart';
 import '../../data/storage/local_storage.dart';
-import '../../widgets/custom_button.dart';
 
-/// Calculatrice scientifique — Mode / Shift / virgule / ⁿ√
+/// Calculatrice scientifique — ⁿ√ simplifiée, Mode, Shift, virgule
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
 
@@ -21,9 +20,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   String _result = '0';
   bool _justCalculated = false;
   bool _shift = false;
-  /// deg | rad | grad
   String _angleMode = 'rad';
-  /// norm | sci | eng
   String _displayMode = 'norm';
 
   void _onButtonPressed(String value) {
@@ -60,8 +57,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           _showModeSheet();
           break;
         case ',':
-          // Virgule décimale (locale FR) → point interne
           _expression += '.';
+          break;
+        case 'ⁿ√':
+          _showNthRootDialog();
           break;
         case '=':
           final res = _service.evaluate(_expression);
@@ -69,7 +68,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           _justCalculated = true;
           _shift = false;
           try {
-            context.read<LocalStorage>().addToHistory(_expression, _result);
+            context.read<LocalStorage>().addToHistory(
+                  _expression,
+                  _result,
+                  module: 'Calculatrice',
+                );
           } catch (_) {}
           break;
         case 'a/b':
@@ -78,10 +81,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           } else if (!_expression.endsWith('/')) {
             _expression += '/';
           }
-          break;
-        case 'ⁿ√':
-          _expression += _shift ? 'cbrt(' : 'root(';
-          _shift = false;
           break;
         case '√':
           _expression += _shift ? 'cbrt(' : 'sqrt(';
@@ -134,23 +133,91 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     });
   }
 
+  /// Dialogue simple : valeur + indice n → résultat immédiat
+  void _showNthRootDialog() {
+    final aCtrl = TextEditingController(
+      text: _expression.isEmpty ? '8' : _expression,
+    );
+    final nCtrl = TextEditingController(text: '3');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Racine n-ième'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: aCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true, signed: true),
+              decoration: const InputDecoration(
+                labelText: 'Valeur (a)',
+                border: OutlineInputBorder(),
+                hintText: 'ex: 8',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true, signed: true),
+              decoration: const InputDecoration(
+                labelText: 'Indice n',
+                border: OutlineInputBorder(),
+                hintText: 'ex: 3 → racine cubique',
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Calcule ⁿ√a  (équivalent à a^(1/n))',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final a = double.tryParse(aCtrl.text.replaceAll(',', '.'));
+              final n = double.tryParse(nCtrl.text.replaceAll(',', '.'));
+              if (a == null || n == null) return;
+              final res = _service.nthRoot(a, n);
+              setState(() {
+                _expression = 'root($a,$n)';
+                _result = res;
+                _justCalculated = true;
+              });
+              try {
+                context.read<LocalStorage>().addToHistory(
+                      'ⁿ√($a) indice $n',
+                      res,
+                      module: 'Calculatrice',
+                    );
+              } catch (_) {}
+              Navigator.pop(ctx);
+            },
+            child: const Text('Calculer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatResult(String raw) {
     final v = double.tryParse(raw.replaceAll(',', '.'));
     if (v == null) return raw;
-    if (_displayMode == 'sci') {
-      return v.toStringAsExponential(6);
-    }
+    if (_displayMode == 'sci') return v.toStringAsExponential(6);
     if (_displayMode == 'eng') {
-      // Engineering: exposant multiple de 3
       if (v == 0) return '0';
-      final exp = (mathLog10(v.abs()) / 3).floor() * 3;
+      final exp = (MathLibrary.log10(v.abs()) / 3).floor() * 3;
       final mant = v / MathLibrary.pow(10.0, exp.toDouble());
       return '${MathLibrary.format(mant)}×10^$exp';
     }
     return MathLibrary.format(v);
   }
-
-  double mathLog10(double x) => MathLibrary.log10(x);
 
   void _showModeSheet() {
     showModalBottomSheet(
@@ -165,62 +232,36 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const Divider(),
             const ListTile(title: Text('Angle')),
-            RadioListTile<String>(
-              title: const Text('Degré (DEG)'),
-              value: 'deg',
-              groupValue: _angleMode,
-              onChanged: (v) {
-                setState(() => _angleMode = v!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Radian (RAD)'),
-              value: 'rad',
-              groupValue: _angleMode,
-              onChanged: (v) {
-                setState(() => _angleMode = v!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Grade (GRAD)'),
-              value: 'grad',
-              groupValue: _angleMode,
-              onChanged: (v) {
-                setState(() => _angleMode = v!);
-                Navigator.pop(ctx);
-              },
-            ),
+            for (final m in [
+              ('deg', 'Degré (DEG)'),
+              ('rad', 'Radian (RAD)'),
+              ('grad', 'Grade (GRAD)'),
+            ])
+              RadioListTile<String>(
+                title: Text(m.$2),
+                value: m.$1,
+                groupValue: _angleMode,
+                onChanged: (v) {
+                  setState(() => _angleMode = v!);
+                  Navigator.pop(ctx);
+                },
+              ),
             const Divider(),
             const ListTile(title: Text('Affichage')),
-            RadioListTile<String>(
-              title: const Text('Normal (NORM)'),
-              value: 'norm',
-              groupValue: _displayMode,
-              onChanged: (v) {
-                setState(() => _displayMode = v!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Scientifique (SCI)'),
-              value: 'sci',
-              groupValue: _displayMode,
-              onChanged: (v) {
-                setState(() => _displayMode = v!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Engineering (ENG)'),
-              value: 'eng',
-              groupValue: _displayMode,
-              onChanged: (v) {
-                setState(() => _displayMode = v!);
-                Navigator.pop(ctx);
-              },
-            ),
+            for (final m in [
+              ('norm', 'Normal (NORM)'),
+              ('sci', 'Scientifique (SCI)'),
+              ('eng', 'Engineering (ENG)'),
+            ])
+              RadioListTile<String>(
+                title: Text(m.$2),
+                value: m.$1,
+                groupValue: _displayMode,
+                onChanged: (v) {
+                  setState(() => _displayMode = v!);
+                  Navigator.pop(ctx);
+                },
+              ),
           ],
         ),
       ),
@@ -264,19 +305,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${_angleMode.toUpperCase()} · ${_displayMode.toUpperCase()}'
-                        '${_shift ? ' · SHIFT' : ''}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _shift ? Colors.orange : Colors.grey,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${_angleMode.toUpperCase()} · ${_displayMode.toUpperCase()}'
+                    '${_shift ? ' · SHIFT' : ''}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _shift ? Colors.orange : Colors.grey,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -333,7 +369,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               b == '⌫' ||
               b == 'a/b' ||
               b == 'MODE' ||
-              b == 'SHIFT';
+              b == 'SHIFT' ||
+              b == 'ⁿ√';
           final highlight = b == 'SHIFT' && _shift;
           return Expanded(
             child: Padding(
@@ -343,7 +380,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     ? Colors.orange.shade400
                     : (isOp
                         ? Theme.of(context).colorScheme.primaryContainer
-                        : Theme.of(context).colorScheme.surfaceContainerHighest),
+                        : Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest),
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),

@@ -5,25 +5,60 @@ import 'package:math_expressions/math_expressions.dart';
 import 'math_library.dart';
 import 'math_expression_engine.dart';
 
-/// Service de calcul scientifique base sur la bibliotheque maths interne.
+/// Service de calcul scientifique — racine n-ième simplifiée.
 class CalculatorService {
   final MathExpressionEngine _engine = MathExpressionEngine();
+
+  /// Calcule directement la racine n-ième (interface simple).
+  String nthRoot(double a, double n) {
+    final r = _nthRoot(a, n);
+    if (r == null) return 'Indéfini';
+    return MathLibrary.format(r);
+  }
 
   String evaluate(String expression) {
     if (expression.trim().isEmpty) return '0';
 
-    // Racine n-ieme : root(a,n) ou ⁿ√(a,n)
+    var expr = expression.replaceAll(' ', '');
+
+    // Formes simplifiées : root(a,n)  ∛a  cbrt(a)  a^(1/n)
     final rootMatch = RegExp(
       r'root\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)',
       caseSensitive: false,
-    ).firstMatch(expression.replaceAll(' ', ''));
+    ).firstMatch(expr);
     if (rootMatch != null) {
       final a = _evalScalar(rootMatch.group(1)!);
       final n = _evalScalar(rootMatch.group(2)!);
-      if (a != null && n != null && n != 0) {
+      if (a != null && n != null) {
         final r = _nthRoot(a, n);
-        if (r != null) return MathLibrary.format(r);
-        return 'Indéfini';
+        return r != null ? MathLibrary.format(r) : 'Indéfini';
+      }
+    }
+
+    // ∛(x) ou cbrt(x)
+    final cbrtMatch = RegExp(
+      r'(?:cbrt|∛)\s*\(\s*([^)]+)\s*\)',
+      caseSensitive: false,
+    ).firstMatch(expr);
+    if (cbrtMatch != null) {
+      final a = _evalScalar(cbrtMatch.group(1)!);
+      if (a != null) {
+        final r = _nthRoot(a, 3);
+        return r != null ? MathLibrary.format(r) : 'Indéfini';
+      }
+    }
+
+    // a^(1/n) exact
+    final powRoot = RegExp(
+      r'^([-+]?\d*\.?\d+(?:e[-+]?\d+)?)\^\(1\/([-+]?\d*\.?\d+)\)$',
+      caseSensitive: false,
+    ).firstMatch(expr);
+    if (powRoot != null) {
+      final a = _evalScalar(powRoot.group(1)!);
+      final n = _evalScalar(powRoot.group(2)!);
+      if (a != null && n != null) {
+        final r = _nthRoot(a, n);
+        return r != null ? MathLibrary.format(r) : 'Indéfini';
       }
     }
 
@@ -37,20 +72,19 @@ class CalculatorService {
   }
 
   double? _evalScalar(String s) {
-    final t = s.trim();
+    final t = s.trim().replaceAll(',', '.');
     if (t == 'pi' || t == 'π') return math.pi;
     if (t == 'e') return math.e;
-    return double.tryParse(t.replaceAll(',', '.'));
+    return double.tryParse(t);
   }
 
   /// Racine n-ième réelle : a^(1/n)
   double? _nthRoot(double a, double n) {
     if (n == 0) return null;
-    // n entier impair : racine de négatif OK
     final nInt = n.round();
     final isInt = (n - nInt).abs() < 1e-9;
     if (a < 0) {
-      if (isInt && nInt % 2 == 1) {
+      if (isInt && nInt.isOdd) {
         return -math.pow(-a, 1 / n).toDouble();
       }
       return null;
@@ -78,10 +112,12 @@ class CalculatorService {
       cm.bindVariable(Variable('pi'), Number(math.pi));
       cm.bindVariable(Variable('e'), Number(math.e));
       cm.bindVariable(Variable('tau'), Number(2 * math.pi));
-      final exp = parser.parse(expr);
-      final result = exp.evaluate(EvaluationType.REAL, cm) as double;
-      if (result.isNaN) return null;
-      return MathLibrary.clean(result);
+      final parsed = parser.parse(expr);
+      final result = parsed.evaluate(EvaluationType.REAL, cm);
+      if (result is num && result.isFinite) {
+        return MathLibrary.clean(result.toDouble());
+      }
+      return null;
     } catch (_) {
       return null;
     }

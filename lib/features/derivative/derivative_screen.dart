@@ -14,13 +14,14 @@ class DerivativeScreen extends StatefulWidget {
 class _DerivativeScreenState extends State<DerivativeScreen> {
   final TextEditingController _funcController =
       TextEditingController(text: 'x^2');
-  final TextEditingController _xController = TextEditingController(text: '2');
+  final TextEditingController _xController = TextEditingController();
   final TextEditingController _aController = TextEditingController(text: '0');
   final TextEditingController _bController = TextEditingController(text: '1');
   String _mode = 'derivée'; // derivée, intégrale
   String _result = '';
   String _numericResult = '';
   String _steps = '';
+  bool _definedIntegral = true;
 
   final MathExpressionEngine _engine = MathExpressionEngine();
 
@@ -93,6 +94,18 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
         _steps = buffer.toString();
       });
     } else {
+      final primitive = _engine.antiderivativePretty(expr);
+      if (!_definedIntegral) {
+        setState(() {
+          _result = primitive == null
+              ? 'Primitive symbolique non disponible'
+              : '∫ $expr dx = $primitive';
+          _steps = primitive == null
+              ? 'Cette forme nécessite une méthode numérique ou une règle supplémentaire.'
+              : 'Primitive générale, sans borne et sans valeur de x.\n$primitive';
+        });
+        return;
+      }
       // Intégrale définie (méthode des trapèzes)
       final a = double.tryParse(_aController.text.replaceAll(',', '.')) ?? 0;
       final b = double.tryParse(_bController.text.replaceAll(',', '.')) ?? 1;
@@ -172,35 +185,61 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
               ),
             )
           else
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _aController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'a (borne inf)',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                  ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Intégrale définie'),
+                  subtitle: const Text(
+                      'Désactiver pour afficher la primitive générale'),
+                  value: _definedIntegral,
+                  onChanged: (value) =>
+                      setState(() => _definedIntegral = value),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _bController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'b (borne sup)',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
+                if (_definedIntegral)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _aController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: InputDecoration(
+                            labelText: 'a (borne inf)',
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _bController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: InputDecoration(
+                            labelText: 'b (borne sup)',
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
               ],
             ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _symbolButton('a⁄b', '(a)/(b)'),
+              _symbolButton('√', 'sqrt()'),
+              _symbolButton('ⁿ√', 'root(n, )'),
+              _symbolButton('xⁿ', 'x^n'),
+              _symbolButton('∫', '∫()dx'),
+            ],
+          ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _calculate,
@@ -264,6 +303,22 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _symbolButton(String label, String insertion) {
+    return OutlinedButton(
+      onPressed: () {
+        final text = _funcController.text;
+        final selection = _funcController.selection;
+        final start = selection.start < 0 ? text.length : selection.start;
+        final end = selection.end < 0 ? text.length : selection.end;
+        _funcController.text = text.replaceRange(start, end, insertion);
+        _funcController.selection =
+            TextSelection.collapsed(offset: start + insertion.length);
+        setState(() {});
+      },
+      child: Text(label, style: const TextStyle(fontSize: 18)),
     );
   }
 }

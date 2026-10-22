@@ -50,6 +50,42 @@ class MathExpressionEngine {
     return result;
   }
 
+  /// Primitive lisible pour les formes usuelles, sans valeur de x requise.
+  String? antiderivativePretty(String input) {
+    final e = normalize(input);
+    if (e == 'x') return 'x²/2 + C';
+    if (e == '1/x') return 'ln|x| + C';
+    final power = RegExp(r'^x\^(\d+)$').firstMatch(e);
+    if (power != null) {
+      final n = int.parse(power.group(1)!);
+      return 'x${_superscript(n + 1)}/${n + 1} + C';
+    }
+    final coeffPower = RegExp(r'^([-+]?\d*\.?\d+)\*x\^(\d+)$').firstMatch(e);
+    if (coeffPower != null) {
+      final coefficient = double.parse(coeffPower.group(1)!);
+      final n = int.parse(coeffPower.group(2)!);
+      final next = n + 1;
+      return '${MathLibrary.format(coefficient / next)}x${_superscript(next)} + C';
+    }
+    final trig = RegExp(r'^(sin|cos|exp)\(x\)$').firstMatch(e);
+    if (trig != null) {
+      switch (trig.group(1)) {
+        case 'sin':
+          return '−cos(x) + C';
+        case 'cos':
+          return 'sin(x) + C';
+        case 'exp':
+          return 'exp(x) + C';
+      }
+    }
+    return null;
+  }
+
+  String _superscript(int value) {
+    const digits = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+    return value.toString().split('').map((d) => digits[int.parse(d)]).join();
+  }
+
   /// True si l'expression est principalement trigonometrique (sin/cos/tan de x).
   bool isTrigExpression(String input) {
     final e = normalize(input);

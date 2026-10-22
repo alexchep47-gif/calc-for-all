@@ -520,7 +520,7 @@ class _GraphScreenState extends State<GraphScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [Tab(text: 'Graphique'), Tab(text: 'Etude')],
+          tabs: const [Tab(text: 'Graphique'), Tab(text: 'Étude')],
         ),
       ),
       body: Column(
@@ -670,6 +670,22 @@ class _GraphScreenState extends State<GraphScreen>
                     child: const Text('+'),
                   ),
                 ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _exportImage,
+                    icon: const Icon(Icons.image_outlined, size: 17),
+                    label: const Text('PNG'),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _exportPdf,
+                    icon: const Icon(Icons.picture_as_pdf_outlined, size: 17),
+                    label: const Text('PDF'),
+                  ),
+                ),
               ],
             ),
           ),
@@ -785,15 +801,15 @@ class _GraphScreenState extends State<GraphScreen>
           _card('Domaine', _study!.domain),
           _card('f′(x)', MathPretty.format(_study!.derivative)),
           _card('f″(x)', MathPretty.format(_study!.secondDerivative)),
-          _card('Racines (f=0)', _study!.roots.join('\n')),
-          _card("Ordonnee a l'origine", _study!.intercepts.join('\n')),
-          _card("Extrema (f'=0)", _study!.extrema.join('\n')),
+          _card('Racines (f = 0)', _study!.roots.join('\n')),
+          _card("Ordonnée à l'origine", _study!.intercepts.join('\n')),
+          _card("Extrema (f′ = 0)", _study!.extrema.join('\n')),
           _card("Points d'inflexion", _study!.inflections.join('\n')),
           _card('Asymptotes', _study!.asymptotes.join('\n')),
           _card('Limites', _study!.limits),
           _card('Tableau de variation', _study!.variationTable),
-          _card('Symetrie', _study!.symmetry),
-          _card('Methode', _study!.explanations),
+          _card('Symétrie', _study!.symmetry),
+          _card('Méthode', _study!.explanations),
         ],
       ),
     );

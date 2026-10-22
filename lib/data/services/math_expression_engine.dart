@@ -29,6 +29,27 @@ class MathExpressionEngine {
     }
   }
 
+  /// Version destinée à l'affichage : multiplication implicite et exposants
+  /// Unicode, sans afficher les opérateurs internes `*` et `^`.
+  String? derivativePretty(String input) {
+    final raw = derivative(input);
+    if (raw == null) return null;
+    var result = raw.replaceAll(' * ', '').replaceAll('*', '');
+    result = result.replaceAllMapped(RegExp(r'\^\s*([0-9]+)'), (match) {
+      const superscripts = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+      return match
+          .group(1)!
+          .split('')
+          .map((digit) => superscripts[int.parse(digit)])
+          .join();
+    });
+    result = result.replaceAll(RegExp(r'\s+'), ' ').trim();
+    while (result.startsWith('(') && result.endsWith(')')) {
+      result = result.substring(1, result.length - 1).trim();
+    }
+    return result;
+  }
+
   /// True si l'expression est principalement trigonometrique (sin/cos/tan de x).
   bool isTrigExpression(String input) {
     final e = normalize(input);
@@ -36,7 +57,8 @@ class MathExpressionEngine {
     if (!trig.hasMatch(e)) return false;
     // Evite de traiter asin/acos comme fenetre π
     if (RegExp(r'\b(asin|acos|atan|sinh|cosh|tanh)\s*\(').hasMatch(e) &&
-        !RegExp(r'\b(sin|cos|tan)\s*\(').hasMatch(e.replaceAll(RegExp(r'a(sin|cos|tan)'), ''))) {
+        !RegExp(r'\b(sin|cos|tan)\s*\(')
+            .hasMatch(e.replaceAll(RegExp(r'a(sin|cos|tan)'), ''))) {
       return false;
     }
     return true;
@@ -206,8 +228,8 @@ class MathExpressionEngine {
         result.add(source.substring(start, i));
       } else if (RegExp(r'[a-zA-Z_]').hasMatch(c)) {
         final start = i++;
-        while (i < source.length &&
-            RegExp(r'[a-zA-Z_0-9]').hasMatch(source[i])) {
+        while (
+            i < source.length && RegExp(r'[a-zA-Z_0-9]').hasMatch(source[i])) {
           i++;
         }
         result.add(source.substring(start, i));
@@ -374,6 +396,10 @@ class _Binary extends _Node {
     if (r is _Number && r.value == 0 && op == '*') return _Number(0);
     if (r is _Number && r.value == 1 && (op == '*' || op == '/')) return l;
     if (l is _Number && l.value == 1 && op == '*') return r;
+    if (op == '^' && r is _Number) {
+      if (r.value == 0) return _Number(1);
+      if (r.value == 1) return l;
+    }
     return _Binary(op, l, r);
   }
 

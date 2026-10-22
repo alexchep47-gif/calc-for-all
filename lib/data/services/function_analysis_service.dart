@@ -56,29 +56,33 @@ class FunctionAnalysisService {
     double xMax = 10,
   }) {
     final normalized = _engine.normalize(expression);
-    final derivative =
+    final rawDerivative =
         _engine.derivative(expression) ?? 'Non calculable automatiquement';
-    final secondDeriv = derivative.startsWith('Non')
+    final derivative = rawDerivative.startsWith('Non')
+        ? rawDerivative
+        : (_engine.derivativePretty(expression) ?? rawDerivative);
+    final rawSecondDeriv = rawDerivative.startsWith('Non')
         ? 'Non calculable'
-        : (_engine.derivative(derivative) ?? 'Non calculable');
+        : (_engine.derivative(rawDerivative) ?? 'Non calculable');
+    final secondDeriv = rawSecondDeriv.startsWith('Non')
+        ? rawSecondDeriv
+        : (_engine.derivativePretty(rawDerivative) ?? rawSecondDeriv);
 
     final points = _graph.evaluateFunction(expression, xMin, xMax, 800);
     final domain = _domain(normalized);
 
     // ——— Points remarquables uniquement ———
-    final criticalXs = _findZerosOf(derivative, xMin, xMax);
+    final criticalXs = _findZerosOf(rawDerivative, xMin, xMax);
     final rootXs = _findZerosOf(expression, xMin, xMax);
-    final inflectionXs = secondDeriv.startsWith('Non')
+    final inflectionXs = rawSecondDeriv.startsWith('Non')
         ? <double>[]
-        : _findZerosOf(secondDeriv, xMin, xMax);
+        : _findZerosOf(rawSecondDeriv, xMin, xMax);
 
     final intercepts = _yIntercept(expression);
-    final roots = rootXs
-        .map((x) {
-          final y = _engine.evaluate(expression, x);
-          return 'Racine : (${_fmt(x)} ; ${_fmt(y ?? 0)})  [f(x)=0]';
-        })
-        .toList();
+    final roots = rootXs.map((x) {
+      final y = _engine.evaluate(expression, x);
+      return 'Racine : (${_fmt(x)} ; ${_fmt(y ?? 0)})  [f(x)=0]';
+    }).toList();
     if (roots.isEmpty) {
       roots.add('Aucune racine detectee sur [${_fmt(xMin)} ; ${_fmt(xMax)}].');
     }
@@ -88,7 +92,7 @@ class FunctionAnalysisService {
     for (final x in criticalXs) {
       final y = _engine.evaluate(expression, x);
       if (y == null || !y.isFinite) continue;
-      final kind = _classifyExtrema(derivative, x);
+      final kind = _classifyExtrema(rawDerivative, x);
       extrema.add('$kind en (${_fmt(x)} ; ${_fmt(y)})  [f\'=0]');
       remarkable.add(MapEntry(x, y));
     }
@@ -102,7 +106,7 @@ class FunctionAnalysisService {
       if (criticalXs.any((c) => (c - x).abs() < 0.05)) continue;
       final y = _engine.evaluate(expression, x);
       if (y == null || !y.isFinite) continue;
-      if (!_concavityChanges(secondDeriv, x)) continue;
+      if (!_concavityChanges(rawSecondDeriv, x)) continue;
       inflections.add('Inflexion en (${_fmt(x)} ; ${_fmt(y)})  [f\'\'=0]');
       remarkable.add(MapEntry(x, y));
     }
@@ -124,7 +128,7 @@ class FunctionAnalysisService {
 
     final variation = _variationTableEpure(
       expression: expression,
-      derivative: derivative,
+      derivative: rawDerivative,
       xMin: xMin,
       xMax: xMax,
       criticalXs: criticalXs,
@@ -412,8 +416,10 @@ f''(x) = $secondDeriv
     List<double> critical,
   ) {
     final lines = <String>[];
-    lines.add('Limite a gauche (x→${_fmt(xMin)}) : ${_limitStr(expression, xMin, left: true)}');
-    lines.add('Limite a droite (x→${_fmt(xMax)}) : ${_limitStr(expression, xMax, left: false)}');
+    lines.add(
+        'Limite a gauche (x→${_fmt(xMin)}) : ${_limitStr(expression, xMin, left: true)}');
+    lines.add(
+        'Limite a droite (x→${_fmt(xMax)}) : ${_limitStr(expression, xMax, left: false)}');
     for (final f in forbidden) {
       final yl = _engine.evaluate(expression, f - 0.01);
       final yr = _engine.evaluate(expression, f + 0.01);
@@ -502,9 +508,7 @@ f''(x) = $secondDeriv
     final parts = <String>[];
     final lb = _logBound(expr);
     if (lb != null) {
-      parts.add(lb.greater
-          ? 'x > ${_fmt(lb.bound)}'
-          : 'x < ${_fmt(lb.bound)}');
+      parts.add(lb.greater ? 'x > ${_fmt(lb.bound)}' : 'x < ${_fmt(lb.bound)}');
     }
     final sqrt = RegExp(
       r'sqrt\(([-+]?\d*\.?\d*)\*?x([-+]\d*\.?\d+)?\)',
@@ -566,9 +570,7 @@ f''(x) = $secondDeriv
     if (left != null && left.abs() < 0.15) {
       result.add('Asymptote horizontale à gauche : y ≈ 0');
     }
-    return result.isEmpty
-        ? ['Aucune asymptote élémentaire détectée.']
-        : result;
+    return result.isEmpty ? ['Aucune asymptote élémentaire détectée.'] : result;
   }
 
   String _period(String expr) {

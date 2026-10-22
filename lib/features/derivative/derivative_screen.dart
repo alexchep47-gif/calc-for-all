@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:math_expressions/math_expressions.dart';
+import '../../data/services/math_expression_engine.dart';
 
-/// Module Dérivée & Intégrale (numérique + règles de base + explications)
+/// Module Dérivée & Intégrale (symbolique hors-ligne + calcul numérique optionnel).
 class DerivativeScreen extends StatefulWidget {
   const DerivativeScreen({super.key});
 
@@ -11,30 +11,24 @@ class DerivativeScreen extends StatefulWidget {
 }
 
 class _DerivativeScreenState extends State<DerivativeScreen> {
-  final TextEditingController _funcController = TextEditingController(text: 'x^2');
+  final TextEditingController _funcController =
+      TextEditingController(text: 'x^2');
   final TextEditingController _xController = TextEditingController(text: '2');
   final TextEditingController _aController = TextEditingController(text: '0');
   final TextEditingController _bController = TextEditingController(text: '1');
   String _mode = 'derivée'; // derivée, intégrale
   String _result = '';
+  String _numericResult = '';
   String _steps = '';
 
-  final Parser _parser = Parser();
+  final MathExpressionEngine _engine = MathExpressionEngine();
 
   double? _eval(String expr, double x) {
     try {
-      final e = expr
-          .replaceAll('×', '*')
-          .replaceAll('÷', '/')
-          .replaceAll('π', 'pi')
-          .replaceAll('√', 'sqrt');
-      final exp = _parser.parse(e);
-      final ctx = ContextModel();
-      ctx.bindVariable(Variable('x'), Number(x));
-      final y = exp.evaluate(EvaluationType.REAL, ctx);
-      if (y is double && y.isFinite) return y;
-    } catch (_) {}
-    return null;
+      return _engine.evaluate(expr, x);
+    } catch (_) {
+      return null;
+    }
   }
 
   void _calculate() {
@@ -42,6 +36,7 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
     if (expr.isEmpty) {
       setState(() {
         _result = 'Entre une fonction';
+        _numericResult = '';
         _steps = '';
       });
       return;
@@ -50,33 +45,38 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
     final buffer = StringBuffer();
 
     if (_mode == 'derivée') {
-      final x0 = double.tryParse(_xController.text.replaceAll(',', '.')) ?? 0;
-      // Approximation numérique de la dérivée (différence centrale)
-      const h = 1e-5;
-      final fPlus = _eval(expr, x0 + h);
-      final fMinus = _eval(expr, x0 - h);
-
-      if (fPlus == null || fMinus == null) {
+      final symbolic = _engine.derivativePretty(expr);
+      if (symbolic == null) {
         setState(() {
-          _result = 'Impossible d’évaluer la fonction';
+          _result = 'Dérivée symbolique non disponible';
+          _numericResult = '';
           _steps = '';
         });
         return;
       }
 
-      final deriv = (fPlus - fMinus) / (2 * h);
-
       buffer.writeln('Fonction : f(x) = $expr');
-      buffer.writeln('Point d’évaluation : x = $x0');
       buffer.writeln();
-      buffer.writeln('Méthode : approximation par différence centrale');
-      buffer.writeln('f′(x) ≈ [f(x+h) − f(x−h)] / (2h)');
-      buffer.writeln('avec h = $h');
+      buffer.writeln('Méthode : dérivation symbolique hors-ligne');
+      buffer.writeln(
+          'Application récursive des règles de somme, produit, quotient, puissance et fonctions usuelles.');
       buffer.writeln();
-      buffer.writeln('f(${x0 + h}) ≈ ${fPlus.toStringAsFixed(8)}');
-      buffer.writeln('f(${x0 - h}) ≈ ${fMinus.toStringAsFixed(8)}');
+      buffer.writeln('Forme algébrique : f′(x) = $symbolic');
       buffer.writeln();
-      buffer.writeln('f′($x0) ≈ ${deriv.toStringAsFixed(6)}');
+      if (_xController.text.trim().isNotEmpty) {
+        final x0 = double.tryParse(_xController.text.replaceAll(',', '.'));
+        final value = x0 == null ? null : _engine.evaluate(symbolic, x0);
+        if (value != null) {
+          _numericResult =
+              'f′(${_xController.text.trim()}) = ${value.toStringAsFixed(6)}';
+          buffer.writeln(_numericResult);
+        } else {
+          _numericResult = 'Valeur de x hors du domaine de définition';
+        }
+      } else {
+        _numericResult = '';
+        buffer.writeln('Aucune valeur numérique demandée.');
+      }
 
       // Quelques règles classiques rappelées
       buffer.writeln();
@@ -88,7 +88,7 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
       buffer.writeln('• (ln x)′ = 1/x');
 
       setState(() {
-        _result = 'f′($x0) ≈ ${deriv.toStringAsFixed(6)}';
+        _result = 'f′(x) = $symbolic';
         _steps = buffer.toString();
       });
     } else {
@@ -153,17 +153,21 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
             decoration: InputDecoration(
               labelText: 'f(x) =',
               hintText: 'ex: x^2, sin(x), 1/x',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 12),
           if (_mode == 'derivée')
             TextField(
               controller: _xController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Valeur de x',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                labelText: 'Valeur de x (optionnel)',
+                hintText: 'Laisser vide pour garder la forme générale',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             )
           else
@@ -172,10 +176,12 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
                 Expanded(
                   child: TextField(
                     controller: _aController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       labelText: 'a (borne inf)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
                 ),
@@ -183,10 +189,12 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
                 Expanded(
                   child: TextField(
                     controller: _bController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       labelText: 'b (borne sup)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
                 ),
@@ -197,30 +205,57 @@ class _DerivativeScreenState extends State<DerivativeScreen> {
             onPressed: _calculate,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
-            child: Text(_mode == 'derivée' ? 'Calculer la dérivée' : 'Calculer l’intégrale'),
+            child: Text(_mode == 'derivée'
+                ? 'Calculer la dérivée'
+                : 'Calculer l’intégrale'),
           ),
           if (_result.isNotEmpty) ...[
             const SizedBox(height: 24),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(18),
-                child: Text(_result, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                child: Text(_result,
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center),
               ),
             ).animate().fadeIn().scale(),
+            if (_mode == 'derivée' && _numericResult.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Card(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Text(
+                      _numericResult,
+                      style: const TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Explications pas-à-pas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Explications pas-à-pas',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
-                    Text(_steps, style: const TextStyle(height: 1.45, fontSize: 13)),
+                    Text(_steps,
+                        style: const TextStyle(height: 1.45, fontSize: 13)),
                   ],
                 ),
               ),

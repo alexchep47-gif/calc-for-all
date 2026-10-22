@@ -49,11 +49,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           _result = res;
           _justCalculated = true;
           try {
-            context.read<LocalStorage>().addHistory(_expression, res);
+            context.read<LocalStorage>().addToHistory(_expression, res);
           } catch (_) {}
           break;
         case 'a/b':
-          // Fraction : si expression = num, ajoute /
           if (_expression.isEmpty) {
             _expression = '1/';
           } else if (!_expression.contains('/')) {
@@ -61,7 +60,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           }
           break;
         case 'ⁿ√':
-          // root(a,n) — utilisateur complète a et n
           _expression += 'root(';
           break;
         case '√':

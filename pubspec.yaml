@@ -1,7 +1,7 @@
 name: calc_for_all
 description: Calc For All - Calculatrice scientifique avancee avec graphiques, nombres complexes et etude de fonction.
 publish_to: 'none'
-version: 2.8.2+6
+version: 2.9.0+7
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

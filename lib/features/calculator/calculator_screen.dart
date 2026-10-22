@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/routes/app_routes.dart';
 import '../../data/services/calculator_service.dart';
 import '../../data/services/math_library.dart';
+import '../../data/services/math_pretty.dart';
 import '../../data/storage/local_storage.dart';
 
 /// Calculatrice scientifique — ⁿ√ simplifiée, Mode, Shift, virgule
@@ -69,7 +70,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           _shift = false;
           try {
             context.read<LocalStorage>().addToHistory(
-                  _expression,
+                  MathPretty.format(_expression),
                   _result,
                   module: 'Calculatrice',
                 );
@@ -133,7 +134,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     });
   }
 
-  /// Dialogue simple : valeur + indice n → résultat immédiat
   void _showNthRootDialog() {
     final aCtrl = TextEditingController(
       text: _expression.isEmpty ? '8' : _expression,
@@ -148,8 +148,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           children: [
             TextField(
               controller: aCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true, signed: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true, signed: true),
               decoration: const InputDecoration(
                 labelText: 'Valeur (a)',
                 border: OutlineInputBorder(),
@@ -159,8 +159,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: nCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true, signed: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true, signed: true),
               decoration: const InputDecoration(
                 labelText: 'Indice n',
                 border: OutlineInputBorder(),
@@ -169,7 +169,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Calcule ⁿ√a  (équivalent à a^(1/n))',
+              'Calcule ⁿ√a',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
@@ -208,15 +208,34 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   String _formatResult(String raw) {
     final v = double.tryParse(raw.replaceAll(',', '.'));
-    if (v == null) return raw;
-    if (_displayMode == 'sci') return v.toStringAsExponential(6);
+    if (v == null) return MathPretty.format(raw);
+    if (_displayMode == 'sci') {
+      return MathPretty.format(v.toStringAsExponential(6));
+    }
     if (_displayMode == 'eng') {
       if (v == 0) return '0';
       final exp = (MathLibrary.log10(v.abs()) / 3).floor() * 3;
       final mant = v / MathLibrary.pow(10.0, exp.toDouble());
-      return '${MathLibrary.format(mant)}×10^$exp';
+      return '${MathLibrary.format(mant)}×10${_sup(exp)}';
     }
     return MathLibrary.format(v);
+  }
+
+  String _sup(int n) {
+    const m = {
+      '0': '⁰',
+      '1': '¹',
+      '2': '²',
+      '3': '³',
+      '4': '⁴',
+      '5': '⁵',
+      '6': '⁶',
+      '7': '⁷',
+      '8': '⁸',
+      '9': '⁹',
+      '-': '⁻',
+    };
+    return n.toString().split('').map((c) => m[c] ?? c).join();
   }
 
   void _showModeSheet() {
@@ -318,7 +337,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     scrollDirection: Axis.horizontal,
                     reverse: true,
                     child: Text(
-                      _expression.isEmpty ? '0' : _expression,
+                      _expression.isEmpty
+                          ? '0'
+                          : MathPretty.format(_expression),
                       style:
                           TextStyle(fontSize: 22, color: Colors.grey.shade600),
                     ),
@@ -347,7 +368,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   _buildRow(['1', '2', '3', '+']),
                   _buildRow(['0', ',', 'π', '=']),
                   _buildRow(['sin', 'cos', 'tan', '√']),
-                  _buildRow(['log', 'ln', '^', 'ⁿ√']),
+                  _buildRow(['log', 'ln', 'xʸ', 'ⁿ√']),
                   _buildRow(['(', ')', 'e', '!']),
                   _buildRow(['C', '⌫', '.', '%']),
                 ],
@@ -363,15 +384,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return Expanded(
       child: Row(
         children: buttons.map((b) {
-          final isOp = _isOperator(b) ||
-              b == '=' ||
-              b == 'C' ||
-              b == '⌫' ||
-              b == 'a/b' ||
-              b == 'MODE' ||
-              b == 'SHIFT' ||
-              b == 'ⁿ√';
-          final highlight = b == 'SHIFT' && _shift;
+          final key = b == 'xʸ' ? '^' : b;
+          final isOp = _isOperator(key) ||
+              key == '=' ||
+              key == 'C' ||
+              key == '⌫' ||
+              key == 'a/b' ||
+              key == 'MODE' ||
+              key == 'SHIFT' ||
+              key == 'ⁿ√';
+          final highlight = key == 'SHIFT' && _shift;
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.all(3),
@@ -386,7 +408,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () => _onButtonPressed(b),
+                  onTap: () => _onButtonPressed(key),
                   child: Center(
                     child: Text(
                       b,

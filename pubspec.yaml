@@ -1,15 +1,13 @@
 name: calc_for_all
 description: Calc For All - Calculatrice scientifique avancee avec graphiques, nombres complexes et etude de fonction.
 publish_to: 'none'
-version: 3.2.0+11
+version: 3.3.0+11
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
 
 dependencies:
   flutter:
-    sdk: flutter
-  flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.8
   provider: ^6.1.2

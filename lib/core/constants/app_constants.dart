@@ -1,7 +1,8 @@
 /// Constantes de l'application
 class AppConstants {
   static const String appName = 'Calc For All';
-  static const String appVersion = '2.7.0';
+  /// Doit suivre pubspec.yaml (version avant le +)
+  static const String appVersion = '3.1.0';
   static const String appDescription =
       'Calculatrice scientifique avancee avec graphiques, nombres complexes et etude de fonction.';
 

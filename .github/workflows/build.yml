@@ -53,8 +53,17 @@ jobs:
 
       - name: Build Flutter Web for /app/
         run: |
+          echo "Building version from pubspec:"
+          grep '^version:' pubspec.yaml
           flutter build web --release --base-href "/app/"
-          echo "Built version:"
+          # Cache-bust: inject build id into index for hard refresh
+          BUILD_ID="${{ github.sha }}"
+          echo "$BUILD_ID" > build/web/.last_build_id
+          if [ -f build/web/index.html ]; then
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html || true
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html || true
+          fi
+          echo "Built version.json:"
           cat build/web/version.json
 
       - uses: actions/upload-artifact@v4
@@ -62,8 +71,7 @@ jobs:
           name: calc-for-all-web
           path: build/web
 
-      # Deploy vers calc-for-all-web/app (Vercel). Token via env, pas dans if.
-      - name: Deploy to calc-for-all-web /app
+      - name: Deploy to calc-for-all-web /app (Vercel)
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
@@ -80,10 +88,11 @@ jobs:
           cp -a build/web/. /tmp/cfa-web/app/
           echo "${{ github.sha }}" > /tmp/cfa-web/app/.last_build_id
           echo "${{ github.sha }}" > /tmp/cfa-web/.calc-for-all-source-sha
+          # Force change so Vercel always redeploys
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/cfa-web/app/.deployed_at
           cd /tmp/cfa-web
           git add -A
           git status
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "Deploy Flutter Web 2.8.1 ${{ github.sha }}"
+          git commit -m "Deploy Calc For All 3.1.0 ${{ github.sha }}" || echo "Nothing to commit"
           git push origin main
-          echo "Deployed to calc-for-all-web/app — Vercel will pick up"
+          echo "Deployed 3.1.0 to calc-for-all-web/app — Vercel will pick up"

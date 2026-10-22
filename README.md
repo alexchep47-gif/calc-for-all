@@ -1,52 +1,73 @@
-# Calc For All  v1.1
+# Calc For All v3.5.0
 
-Calculatrice Android Flutter avancée : scientifique + graphiques + nombres complexes + **étude de fonction complète**.
+Calculatrice Flutter avancée, hors ligne, avec modules scientifiques, graphiques, probabilités, statistiques, géométrie, suites, matrices, solveur d’équations, nombres complexes et outils de conversion.
 
 ## Fonctionnalités
 
-- Calculatrice scientifique (sin, cos, log, √, π, fractions a/b…)
-- Tracé de courbes interactif
-- **Étude de fonction** : domaine, période, extremums, asymptotes, tableau de variation, symétrie + explications
-- Export du plan d’étude en **PDF**
+- Calculatrice scientifique complète : opérations de base, fractions, racines, puissances, fonctions trigonométriques, logarithmes, etc.
+- Graphique de fonctions avec analyse visuelle
 - Nombres complexes
-- Historique
-- Thème clair / sombre + animations
+- Géométrie, suites, dérivées et intégrales
+- Solveur d’équations et systèmes
+- Matrices et inéquations
+- Statistiques et probabilités
+- Convertisseur d’unités et devises
+- Conversion de bases numériques : binaire, octal, décimal, hexadécimal
+- Calcul des p-uplets en probabilités
+- Historique des calculs
+- Thème clair / sombre / OLED, taille de texte adaptable
 - 100 % hors ligne
+- Prise en charge de la langue française et anglaise
 
-## Compilation (GitHub Actions)
+## Aperçu web
 
-1. Va sur l’onglet **Actions**
-2. Clique sur **Build APK** → **Run workflow**
-3. Attends la fin (vert)
-4. Télécharge l’artefact `calc-for-all-apk`
-5. Installe l’APK
+Le projet est déployé sur Vercel pour la version Web :
 
-## Preview Web
+https://calc-for-all-web.vercel.app/app/
 
-Chaque push sur `main` compile automatiquement la version Flutter Web et la
-publie sur GitHub Pages via le workflow **Deploy Flutter Web Preview**.
+Chaque push sur `main` déclenche la compilation Flutter Web de la version courante.
 
-Après la première exécution réussie, la preview est accessible à l’adresse :
+## Compilation mobile (GitHub Actions)
 
-https://alexchep47-gif.github.io/calc-for-all/
+1. Ouvre l’onglet **Actions** du dépôt.
+2. Sélectionne le workflow **Build APK**.
+3. Clique sur **Run workflow**.
+4. Attends la fin du build.
+5. Télécharge l’artefact APK généré.
 
-Si GitHub Pages n’est pas encore activé, ouvre **Settings → Pages**, sélectionne
-**GitHub Actions** comme source de déploiement, puis relance le workflow.
+## Structure du projet
 
-## Structure
-
-```
+```text
 lib/
   main.dart
   core/
   data/
   features/
     calculator/
-    graph/          ← étude de fonction
+    graph/
     complex/
     history/
     settings/
+    probability/
+    statistics/
+    converter/
+    geometry/
+    sequences/
+    matrices/
+    solver/
+    trigonometry/
+    exercises/
+    library/
   widgets/
 ```
 
-Développé pour être compilé uniquement depuis un téléphone + GitHub.
+## Développement
+
+- Flutter 3.x
+- Dart
+- Compatible web et mobile
+- Déploiement automatisé via GitHub Actions et Vercel
+
+## Notes
+
+Ce projet a été conçu pour fournir une calculatrice polyvalente, éducative et autonome, avec un accès rapide à plusieurs modules de calcul avancés.

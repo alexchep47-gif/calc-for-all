@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appName = 'Calc For All';
-  static const String appVersion = '3.5.2';
+  static const String appVersion = '3.5.3';
   static const String appDescription =
       'Calculatrice scientifique avancée avec graphiques, nombres complexes et étude de fonction.';
 

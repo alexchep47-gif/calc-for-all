@@ -3,7 +3,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/l10n/locale_provider.dart';
-import '../../data/storage/local_storage.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -108,12 +107,6 @@ class HomeScreen extends StatelessWidget {
             Icons.swap_horiz_rounded,
             const Color(0xFF455A64),
             AppRoutes.converter),
-        _Module(
-            loc.t('Paramètres', 'Settings'),
-            loc.t('Thème, langue, affichage', 'Theme, language, display'),
-            Icons.settings_rounded,
-            const Color(0xFF607D8B),
-            AppRoutes.settings),
       ];
 
   @override
@@ -131,6 +124,7 @@ class HomeScreen extends StatelessWidget {
             onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
           ),
           IconButton(
+            tooltip: loc.t('Paramètres', 'Settings'),
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
           ),
@@ -138,7 +132,15 @@ class HomeScreen extends StatelessWidget {
       ),
       body: CustomScrollView(
         slivers: [
-          SnippetHeader(loc: loc),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Text(
+                loc.t('Modules', 'Modules'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
           SliverPadding(
             padding: const EdgeInsets.all(12),
             sliver: SliverGrid(
@@ -161,23 +163,6 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class SnippetHeader extends StatelessWidget {
-  final LocaleProvider loc;
-  const SnippetHeader({super.key, required this.loc});
-  @override
-  Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-        child: Text(
-          loc.t('Modules', 'Modules'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
       ),
     );
   }

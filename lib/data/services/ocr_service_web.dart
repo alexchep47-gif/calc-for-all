@@ -23,15 +23,9 @@ class OcrService {
     return text.isEmpty ? null : _normalizeMathText(text);
   }
 
-  String _normalizeMathText(String text) => text
-      .replaceAll(RegExp(r'[\n\r]+'), '')
-      .replaceAll('×', '*')
-      .replaceAll('·', '*')
-      .replaceAll('÷', '/')
-      .replaceAll('−', '-')
-      .replaceAll('²', '^2')
-      .replaceAll('³', '^3')
-      .replaceAll('O', '0')
-      .replaceAll('l', '1')
-      .replaceAll(' ', '');
+  String _normalizeMathText(String text) {
+    final cleaned = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return cleaned.isEmpty ? '' : cleaned;
+  }
 }
+

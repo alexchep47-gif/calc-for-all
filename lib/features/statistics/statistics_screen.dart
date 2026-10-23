@@ -40,7 +40,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void _rebuildTable() {
     _xCtrls = List.generate(_n, (i) => TextEditingController(text: '${i + 1}'));
     _yCtrls = List.generate(
-        _n, (i) => TextEditingController(text: '${(i + 1) * 2 + (i % 2)}'));
+      _n,
+      (i) => TextEditingController(text: '${(i + 1) * 2 + (i % 2)}'),
+    );
   }
 
   @override
@@ -77,24 +79,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     return double.tryParse(t);
   }
 
-  double? _extractImplicitMean(String text) {
-    final normalized = text.toLowerCase();
-    final patterns = [
-      RegExp(r'moyenne\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
-      RegExp(r'mean\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
-      RegExp(r'xbar\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
-      RegExp(r'x̄\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
-    ];
-    for (final pattern in patterns) {
-      final match = pattern.firstMatch(normalized);
-      if (match != null) {
-        final value = double.tryParse(match.group(1)!.replaceAll(',', '.'));
-        if (value != null) return value;
-      }
-    }
-    return null;
-  }
-
   void _resize(int n) {
     setState(() {
       for (final c in _xCtrls) {
@@ -118,23 +102,25 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         .toList();
     final values = <double>[];
     final unknownCount = parts.where((p) =>
-        RegExp(r'^(\?|x|inconnue|unknown)$', caseSensitive: false).hasMatch(p)).length;
+            RegExp(r'^(\?|x|inconnue)$', caseSensitive: false).hasMatch(p))
+        .length;
     double? resolvedUnknown;
-    final inferredTarget = _parse(_targetMeanCtrl.text) ?? _extractImplicitMean(_seriesCtrl.text);
-
     for (final p in parts) {
       final v = _parse(p);
       if (v != null) values.add(v);
     }
     if (unknownCount > 0) {
-      final target = inferredTarget;
+      final target = _parse(_targetMeanCtrl.text);
       if (target == null) {
         setState(() {
-          _result = loc.t('Indiquez la moyenne cible pour déterminer les inconnues.',
-              'Enter a target mean to determine the unknowns.');
+          _result = loc.t(
+            'Indiquez la moyenne cible pour déterminer les inconnues.',
+            'Enter a target mean to determine the unknowns.',
+          );
           _steps = loc.t(
-              'Une ou plusieurs valeurs sont notées ?. On peut aussi déduire la moyenne cible à partir d’une information explicite du texte.',
-              'One or more values are marked ?. A target mean may also be inferred from explicit text information.');
+            'Une ou plusieurs valeurs sont notées ?. Avec plusieurs inconnues, une moyenne cible est nécessaire.',
+            'One or more values are marked ?. With several unknowns, a target mean is required.',
+          );
         });
         return;
       }
@@ -172,10 +158,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     buf.writeln('${loc.t('Variance', 'Variance')} = ${_fmt(variance)}');
     buf.writeln('${loc.t('Écart-type', 'Std. deviation')} σ = ${_fmt(std)}');
     buf.writeln(
-        '${loc.t('Min', 'Min')} = ${_fmt(values.first)}  ${loc.t('Max', 'Max')} = ${_fmt(values.last)}');
+      '${loc.t('Min', 'Min')} = ${_fmt(values.first)}  ${loc.t('Max', 'Max')} = ${_fmt(values.last)}',
+    );
     final counts = <double, int>{};
     for (final v in values) {
-      final key = counts.keys.firstWhere((k) => (k - v).abs() < MathLibrary.epsilon, orElse: () => v);
+      final key = counts.keys.firstWhere(
+        (k) => (k - v).abs() < MathLibrary.epsilon,
+        orElse: () => v,
+      );
       counts[key] = (counts[key] ?? 0) + 1;
     }
     final modalities = counts.keys.toList()..sort();
@@ -183,22 +173,31 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final classWidth = _parse(_classWidthCtrl.text) ?? 1;
     var ecc = 0;
     buf.writeln();
-    buf.writeln('— ${loc.t('Effectifs et fréquences cumulés', 'Cumulative counts and frequencies')} —');
+    buf.writeln(
+      '— ${loc.t('Effectifs et fréquences cumulés', 'Cumulative counts and frequencies')} —',
+    );
     buf.writeln('xᵢ | nᵢ | fᵢ | ECC | ECD | FCC | FCD');
     for (final value in modalities) {
       ecc += counts[value]!;
       final ecd = counts.entries
           .where((entry) => entry.key >= value - MathLibrary.epsilon)
           .fold<int>(0, (total, entry) => total + entry.value);
-      buf.writeln('${_fmt(value)} | ${counts[value]} | ${_fmt(counts[value]! / n)} | '
-          '$ecc | $ecd | ${_fmt(ecc / n)} | ${_fmt(ecd / n)}');
+      buf.writeln(
+        '${_fmt(value)} | ${counts[value]} | ${_fmt(counts[value]! / n)} | '
+        '$ecc | $ecd | ${_fmt(ecc / n)} | ${_fmt(ecd / n)}',
+      );
     }
-    buf.writeln('${loc.t('Classe modale', 'Modal class')} : '
-        '[${_fmt(modal - classWidth / 2)} ; ${_fmt(modal + classWidth / 2)}[');
+    buf.writeln(
+      '${loc.t('Classe modale', 'Modal class')} : '
+      '[${_fmt(modal - classWidth / 2)} ; ${_fmt(modal + classWidth / 2)}[',
+    );
     if (unknownCount > 0) {
-      buf.writeln(loc.t(
-          'Les inconnues ont été calculées à partir de la moyenne cible et des données connues.',
-          'Unknowns were calculated from the target mean and the known data.'));
+      buf.writeln(
+        loc.t(
+          'Les inconnues ont été prises égales : une moyenne seule ne permet pas de déterminer plusieurs valeurs de manière unique.',
+          'Unknowns were set equal: a mean alone cannot uniquely determine several values.',
+        ),
+      );
     }
     setState(() {
       _result = '${loc.t('Moyenne', 'Mean')} : ${_fmt(mean)}\n'
@@ -222,13 +221,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       if (x != null) xs.add(x); else if (xUnknown) unknownX++;
       if (y != null) ys.add(y); else if (yUnknown) unknownY++;
     }
-
-    final targetX = _parse(_targetMeanXCtrl.text) ?? _extractImplicitMean(_targetMeanXCtrl.text);
-    final targetY = _parse(_targetMeanYCtrl.text) ?? _extractImplicitMean(_targetMeanYCtrl.text);
-
+    final targetX = _parse(_targetMeanXCtrl.text);
+    final targetY = _parse(_targetMeanYCtrl.text);
     if (unknownX > 0) {
       if (targetX == null) {
-        setState(() { _result = loc.t('Moyenne cible de x requise pour les inconnues.', 'Target mean of x is required.'); _steps = ''; });
+        setState(() {
+          _result = loc.t(
+            'Moyenne cible de x requise pour les inconnues.',
+            'Target mean of x is required.',
+          );
+          _steps = '';
+        });
         return;
       }
       final value = (targetX * _n - xs.fold<double>(0, (a, b) => a + b)) / unknownX;
@@ -236,7 +239,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
     if (unknownY > 0) {
       if (targetY == null) {
-        setState(() { _result = loc.t('Moyenne cible de y requise pour les inconnues.', 'Target mean of y is required.'); _steps = ''; });
+        setState(() {
+          _result = loc.t(
+            'Moyenne cible de y requise pour les inconnues.',
+            'Target mean of y is required.',
+          );
+          _steps = '';
+        });
         return;
       }
       final value = (targetY * _n - ys.fold<double>(0, (a, b) => a + b)) / unknownY;
@@ -245,7 +254,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     if (xs.length < 2) {
       setState(() {
         _result = loc.t(
-            'Au moins 2 couples (x, y) valides', 'At least 2 valid (x, y) pairs');
+          'Au moins 2 couples (x, y) valides',
+          'At least 2 valid (x, y) pairs',
+        );
         _steps = '';
       });
       return;
@@ -266,6 +277,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       sumXY += dx * dy;
     }
 
+    // Covariance & corrélation
     final cov = sumXY / n;
     final varX = sumXX / n;
     final varY = sumYY / n;
@@ -274,12 +286,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final r = (sx > 0 && sy > 0) ? cov / (sx * sy) : double.nan;
     final r2 = r.isFinite ? r * r : double.nan;
 
+    // Moindres carrés : y = a + b x  (régression de y en x)
     final bYx = sumXX.abs() > 1e-15 ? sumXY / sumXX : double.nan;
     final aYx = meanY - bYx * meanX;
 
+    // Régression de x en y : x = c + d y
     final dXy = sumYY.abs() > 1e-15 ? sumXY / sumYY : double.nan;
     final cXy = meanX - dXy * meanY;
 
+    // Méthode de Mayer : deux groupes (première / seconde moitié triée par x)
     final indices = List.generate(n, (i) => i);
     indices.sort((i, j) => xs[i].compareTo(xs[j]));
     final mid = n ~/ 2;
@@ -293,6 +308,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         (x2 - x1).abs() > 1e-15 ? (y2 - y1) / (x2 - x1) : double.nan;
     final aMayer = y1 - bMayer * x1;
 
+    // Droite médiane approximative (quartiles sur x triés)
     String mayerLine = bMayer.isFinite
         ? 'y = ${_fmt(aMayer)} + ${_fmt(bMayer)}·x'
         : loc.t('non calculable', 'not computable');
@@ -305,71 +321,85 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     buf.writeln();
     buf.writeln('— ${loc.t('Dispersion', 'Dispersion')} —');
     buf.writeln(
-        '${loc.t('Variance', 'Variance')} σ²ₓ = ${_fmt(varX)}    σ²ᵧ = ${_fmt(varY)}');
+      '${loc.t('Variance', 'Variance')} σ²ₓ = ${_fmt(varX)}    σ²ᵧ = ${_fmt(varY)}',
+    );
     buf.writeln(
-        '${loc.t('Écarts-types', 'Std. deviations')} σₓ = ${_fmt(sx)}    σᵧ = ${_fmt(sy)}');
+      '${loc.t('Écarts-types', 'Std. deviations')} σₓ = ${_fmt(sx)}    σᵧ = ${_fmt(sy)}',
+    );
     buf.writeln(
-        '${loc.t('Covariance', 'Covariance')} cov(x,y) = ${_fmt(cov)}');
+      '${loc.t('Covariance', 'Covariance')} cov(x,y) = ${_fmt(cov)}',
+    );
     buf.writeln();
     buf.writeln('— ${loc.t('Corrélation', 'Correlation')} —');
     buf.writeln(
-        '${loc.t('Coefficient de Pearson', 'Pearson coefficient')} r = ${_fmt(r)}');
+      '${loc.t('Coefficient de Pearson', 'Pearson coefficient')} r = ${_fmt(r)}',
+    );
     buf.writeln('r² = ${_fmt(r2)}');
     if (r.isFinite) {
       if (r.abs() > 0.8) {
-        buf.writeln(loc.t('→ corrélation forte',
-            '→ strong correlation'));
+        buf.writeln(loc.t('→ corrélation forte', '→ strong correlation'));
       } else if (r.abs() > 0.5) {
-        buf.writeln(loc.t('→ corrélation moyenne',
-            '→ moderate correlation'));
+        buf.writeln(loc.t('→ corrélation moyenne', '→ moderate correlation'));
       } else {
-        buf.writeln(loc.t('→ corrélation faible',
-            '→ weak correlation'));
+        buf.writeln(loc.t('→ corrélation faible', '→ weak correlation'));
       }
     }
     buf.writeln();
     buf.writeln(
-        '— ${loc.t('Moindres carrés — régression de y en x', 'Least squares — y on x')} —');
+      '— ${loc.t('Moindres carrés — régression de y en x', 'Least squares — y on x')} —',
+    );
     buf.writeln('y = a + b·x');
-    buf.writeln(
-        'b = Σ(x−x̄)(y−ȳ) / Σ(x−x̄)² = ${_fmt(bYx)}');
+    buf.writeln('b = Σ(x−x̄)(y−ȳ) / Σ(x−x̄)² = ${_fmt(bYx)}');
     buf.writeln('a = ȳ − b·x̄ = ${_fmt(aYx)}');
     buf.writeln('⇒ y = ${_fmt(aYx)} + ${_fmt(bYx)}·x');
     buf.writeln();
     buf.writeln(
-        '— ${loc.t('Moindres carrés — régression de x en y', 'Least squares — x on y')} —');
+      '— ${loc.t('Moindres carrés — régression de x en y', 'Least squares — x on y')} —',
+    );
     buf.writeln('x = c + d·y');
     buf.writeln('d = ${_fmt(dXy)}    c = ${_fmt(cXy)}');
     buf.writeln('⇒ x = ${_fmt(cXy)} + ${_fmt(dXy)}·y');
     buf.writeln();
     buf.writeln(
-        '— ${loc.t('Méthode de Mayer', 'Mayer method')} —');
-    buf.writeln(loc.t(
+      '— ${loc.t('Méthode de Mayer', 'Mayer method')} —',
+    );
+    buf.writeln(
+      loc.t(
         'Séries ordonnées selon x, deux groupes de moyennes :',
-        'Series sorted by x, two groups of means:'));
-    buf.writeln(
-        'G1 (n=${g1.length}) : (x̄₁,ȳ₁) = (${_fmt(x1)}, ${_fmt(y1)})');
-    buf.writeln(
-        'G2 (n=${g2.length}) : (x̄₂,ȳ₂) = (${_fmt(x2)}, ${_fmt(y2)})');
-    buf.writeln(
-        'b = (ȳ₂−ȳ₁)/(x̄₂−x̄₁) = ${_fmt(bMayer)}');
+        'Series sorted by x, two groups of means:',
+      ),
+    );
+    buf.writeln('G1 (n=${g1.length}) : (x̄₁,ȳ₁) = (${_fmt(x1)}, ${_fmt(y1)})');
+    buf.writeln('G2 (n=${g2.length}) : (x̄₂,ȳ₂) = (${_fmt(x2)}, ${_fmt(y2)})');
+    buf.writeln('b = (ȳ₂−ȳ₁)/(x̄₂−x̄₁) = ${_fmt(bMayer)}');
     buf.writeln('a = ȳ₁ − b·x̄₁ = ${_fmt(aMayer)}');
     buf.writeln('⇒ $mayerLine');
     buf.writeln();
     buf.writeln(
-        '— ${loc.t('Autres', 'Other')} —');
+      '— ${loc.t('Autres', 'Other')} —',
+    );
     if (bYx.isFinite && dXy.isFinite && (bYx * dXy).abs() > 1e-15) {
-      buf.writeln(loc.t(
+      buf.writeln(
+        loc.t(
           'Produit des pentes b·d = r² (si centrées correctement) ≈ ${_fmt(bYx * dXy)}',
-          'Product of slopes b·d ≈ r² ≈ ${_fmt(bYx * dXy)}'));
+          'Product of slopes b·d ≈ r² ≈ ${_fmt(bYx * dXy)}',
+        ),
+      );
     }
-    buf.writeln(loc.t(
+    buf.writeln(
+      loc.t(
         'Droite des moindres carrés orthogonaux non détaillée ici.',
-        'Orthogonal least-squares line not detailed here.'));
+        'Orthogonal least-squares line not detailed here.',
+      ),
+    );
+
     String cumulativeTable(String name, List<double> data, double width) {
       final counts = <double, int>{};
       for (final value in data) {
-        final key = counts.keys.firstWhere((k) => (k - value).abs() < MathLibrary.epsilon, orElse: () => value);
+        final key = counts.keys.firstWhere(
+          (k) => (k - value).abs() < MathLibrary.epsilon,
+          orElse: () => value,
+        );
         counts[key] = (counts[key] ?? 0) + 1;
       }
       final modes = counts.keys.toList()..sort();
@@ -377,16 +407,36 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       final out = StringBuffer('— $name —\nxᵢ | nᵢ | fᵢ | ECC | ECD | FCC | FCD\n');
       for (final value in modes) {
         ecc += counts[value]!;
-        final ecd = counts.entries.where((e) => e.key >= value - MathLibrary.epsilon).fold<int>(0, (a, e) => a + e.value);
-        out.writeln('${_fmt(value)} | ${counts[value]} | ${_fmt(counts[value]! / data.length)} | $ecc | $ecd | ${_fmt(ecc / data.length)} | ${_fmt(ecd / data.length)}');
+        final ecd = counts.entries
+            .where((e) => e.key >= value - MathLibrary.epsilon)
+            .fold<int>(0, (a, e) => a + e.value);
+        out.writeln(
+          '${_fmt(value)} | ${counts[value]} | ${_fmt(counts[value]! / data.length)} | '
+          '$ecc | $ecd | ${_fmt(ecc / data.length)} | ${_fmt(ecd / data.length)}',
+        );
       }
       final modal = modes.reduce((a, b) => counts[a]! >= counts[b]! ? a : b);
-      out.writeln('${loc.t('Classe modale', 'Modal class')} : [${_fmt(modal - width / 2)} ; ${_fmt(modal + width / 2)}[');
+      out.writeln(
+        '${loc.t('Classe modale', 'Modal class')} : [${_fmt(modal - width / 2)} ; ${_fmt(modal + width / 2)}[',
+      );
       return out.toString();
     }
+
     buf.writeln();
-    buf.writeln(cumulativeTable(loc.t('Série marginale x', 'Marginal x series'), xs, _parse(_classWidthXCtrl.text) ?? 1));
-    buf.writeln(cumulativeTable(loc.t('Série marginale y', 'Marginal y series'), ys, _parse(_classWidthYCtrl.text) ?? 1));
+    buf.writeln(
+      cumulativeTable(
+        loc.t('Série marginale x', 'Marginal x series'),
+        xs,
+        _parse(_classWidthXCtrl.text) ?? 1,
+      ),
+    );
+    buf.writeln(
+      cumulativeTable(
+        loc.t('Série marginale y', 'Marginal y series'),
+        ys,
+        _parse(_classWidthYCtrl.text) ?? 1,
+      ),
+    );
 
     setState(() {
       _result = loc.t(
@@ -448,10 +498,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               maxLines: 3,
               decoration: InputDecoration(
                 labelText: loc.t(
-                    'Données (espaces ou virgules)', 'Data (spaces or commas)'),
+                  'Données (espaces ou virgules)',
+                  'Data (spaces or commas)',
+                ),
                 hintText: '12 15 18 20 22',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
             const SizedBox(height: 10),
@@ -484,8 +535,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              loc.t('Utilisez ? pour une inconnue. La moyenne cible peut aussi être indiquée implicitement comme "moyenne = 15".',
-                  'Use ? for an unknown. The target mean can also be inferred from text such as "mean = 15".'),
+              loc.t(
+                'Utilisez ? pour une inconnue. Avec plusieurs inconnues, elles sont déterminées égales à partir de la moyenne cible.',
+                'Use ? for an unknown. With several unknowns, they are set equal from the target mean.',
+              ),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ] else ...[
@@ -495,8 +548,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 DropdownButton<int>(
                   value: _n,
                   items: [2, 3, 4, 5, 6, 8, 10, 12, 15, 20]
-                      .map((e) =>
-                          DropdownMenuItem(value: e, child: Text('$e')))
+                      .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
                       .toList(),
                   onChanged: (v) {
                     if (v != null) _resize(v);
@@ -513,81 +565,139 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 8),
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _targetMeanXCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: loc.t('Moyenne cible x', 'Target mean x'),
-                    hintText: 'ex. 12',
-                    border: const OutlineInputBorder(),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _targetMeanXCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: loc.t('Moyenne cible x', 'Target mean x'),
+                      hintText: 'ex. 12',
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _targetMeanYCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: loc.t('Moyenne cible y', 'Target mean y'),
-                    hintText: 'ex. 16',
-                    border: const OutlineInputBorder(),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _targetMeanYCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: loc.t('Moyenne cible y', 'Target mean y'),
+                      hintText: 'ex. 16',
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-            ]),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _classWidthXCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: loc.t('Amplitude x', 'Width x'),
-                    hintText: '1',
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _classWidthYCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: loc.t('Amplitude y', 'Width y'),
-                    hintText: '1',
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 8),
-            // table rows omitted for brevity in this patch
-          ],
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: _calculate,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              ],
             ),
-            child: Text(loc.t('Calculer', 'Calculate')),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _classWidthXCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: loc.t('Amplitude x', 'Width x'),
+                      hintText: '1',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _classWidthYCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: loc.t('Amplitude y', 'Width y'),
+                      hintText: '1',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              loc.t(
+                'Utilisez ? dans une cellule pour une inconnue xᵢ ou yᵢ.',
+                'Use ? in a cell for an unknown xᵢ or yᵢ.',
+              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'xᵢ',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    'yᵢ',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            ...List.generate(_n, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _xCtrls[i],
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: 'x${i + 1}',
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _yCtrls[i],
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: 'y${i + 1}',
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _calculate,
+            icon: const Icon(Icons.calculate),
+            label: Text(loc.t('Calculer', 'Compute')),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
           ),
           if (_result.isNotEmpty) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 child: Text(
                   _result,
                   style: const TextStyle(
-                    fontSize: 18,
                     fontWeight: FontWeight.w700,
+                    height: 1.5,
+                    fontSize: 15,
                   ),
                 ),
               ),
@@ -595,283 +705,27 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             const SizedBox(height: 10),
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(_steps, style: const TextStyle(height: 1.5)),
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.t('Détails pas à pas', 'Step-by-step details'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      _steps,
+                      style: const TextStyle(height: 1.45, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
-            ).animate().fadeIn(delay: 100.ms),
+            ),
           ],
         ],
       ),
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

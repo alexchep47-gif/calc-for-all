@@ -28,7 +28,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final expression = await _ocrService.recognizeExpression();
     if (!mounted) return;
     if (expression == null || expression.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OCR indisponible sur le Web ou image illisible. Utilisez une photo nette sur Android/iOS.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OCR : image illisible ou moteur Tesseract.js non chargé. Vérifiez la connexion puis réessayez.')));
       return;
     }
     setState(() { _expression = expression; _result = '0'; _justCalculated = false; });

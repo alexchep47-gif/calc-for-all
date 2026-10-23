@@ -1,345 +1,109 @@
 import 'dart:math' as math;
 
-/// Bibliotheque mathematique hors-ligne (equivalent d'un math.h / cmath).
-/// Constantes, fonctions usuelles, nettoyage d'expression, evaluation sure.
+/// Bibliothèque mathématique interne (jamais affichée sous ce nom dans l’UI).
 class MathLibrary {
-  MathLibrary._();
-
-  // ——— Constantes (comme M_PI, M_E en C) ———
   static const double pi = math.pi;
   static const double e = math.e;
-  static const double tau = 2 * math.pi;
-  static const double ln2 = math.ln2;
-  static const double ln10 = math.ln10;
-  static const double sqrt2 = math.sqrt2;
-  static const double epsilon = 1e-12;
 
-  /// Fonctions reconnues (nom normalise → evaluation)
-  static const Set<String> functionNames = {
-    'sin',
-    'cos',
-    'tan',
-    'sec',
-    'csc',
-    'cot',
-    'asin',
-    'arsin',
-    'acos',
-    'arcos',
-    'atan',
-    'artan',
-    'acot',
-    'arcotan',
-    'atan2',
-    'sinh',
-    'sh',
-    'cosh',
-    'ch',
-    'tanh',
-    'th',
-    'asinh',
-    'agsh',
-    'acosh',
-    'agch',
-    'atanh',
-    'agth',
-    'sqrt',
-    'cbrt',
-    'abs',
-    'exp',
-    'ln',
-    'log',
-    'log10',
-    'log2',
-    'floor',
-    'ceil',
-    'round',
-    'sign',
-    'fact',
-    'factorial',
+  static final Set<String> functionNames = {
+    'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+    'sinh', 'cosh', 'tanh',
+    'log', 'ln', 'log10', 'exp', 'sqrt', 'cbrt', 'abs',
   };
 
-  // ——— Fonctions numeriques ———
-  static double sin(double x) => math.sin(x);
-  static double cos(double x) => math.cos(x);
-  static double tan(double x) => math.tan(x);
-  static double sec(double x) {
-    final c = math.cos(x);
-    return c.abs() < epsilon ? double.nan : 1 / c;
-  }
-
-  static double csc(double x) {
-    final s = math.sin(x);
-    return s.abs() < epsilon ? double.nan : 1 / s;
-  }
-
-  static double cot(double x) {
-    final s = math.sin(x);
-    return s.abs() < epsilon ? double.nan : math.cos(x) / s;
-  }
-  static double asin(double x) => x.abs() <= 1 ? math.asin(x) : double.nan;
-  static double arsin(double x) => asin(x);
-  static double acos(double x) => x.abs() <= 1 ? math.acos(x) : double.nan;
-  static double arcos(double x) => acos(x);
-  static double atan(double x) => math.atan(x);
-  static double artan(double x) => atan(x);
-  static double acot(double x) => x == 0 ? math.pi / 2 : math.atan(1 / x) + (x < 0 ? math.pi : 0);
-  static double arcotan(double x) => acot(x);
-  static double atan2(double y, double x) => math.atan2(y, x);
-
-  /// Hyperboliques (implementes a la main : absents de dart:math sur SDK 3.x)
-  static double sinh(double x) {
-    if (x.abs() < 1e-8) return x;
-    if (x > 20) return math.exp(x) / 2;
-    if (x < -20) return -math.exp(-x) / 2;
-    final e1 = math.exp(x);
-    final e2 = math.exp(-x);
-    return (e1 - e2) / 2;
-  }
-
-  static double cosh(double x) {
-    if (x.abs() > 20) return math.exp(x.abs()) / 2;
-    final e1 = math.exp(x);
-    final e2 = math.exp(-x);
-    return (e1 + e2) / 2;
-  }
-
-  static double tanh(double x) {
-    if (x > 20) return 1;
-    if (x < -20) return -1;
-    final e2 = math.exp(2 * x);
-    return (e2 - 1) / (e2 + 1);
-  }
-
-  static double asinh(double x) => math.log(x + math.sqrt(x * x + 1));
-  static double acosh(double x) => x < 1 ? double.nan : math.log(x + math.sqrt(x * x - 1));
-  static double atanh(double x) => x.abs() >= 1 ? double.nan : 0.5 * math.log((1 + x) / (1 - x));
-
-  static double sqrt(double x) => x >= 0 ? math.sqrt(x) : double.nan;
-  static double cbrt(double x) =>
-      x >= 0 ? math.pow(x, 1 / 3).toDouble() : -math.pow(-x, 1 / 3).toDouble();
-  static double abs(double x) => x.abs();
-  static double exp(double x) => math.exp(x);
-  static double ln(double x) => x > 0 ? math.log(x) : double.nan;
-  static double log10(double x) => x > 0 ? math.log(x) / ln10 : double.nan;
-  static double log2(double x) => x > 0 ? math.log(x) / ln2 : double.nan;
-  static double pow(double a, double b) => math.pow(a, b).toDouble();
-  static double floor(double x) => x.floorToDouble();
-  static double ceil(double x) => x.ceilToDouble();
-  static double round(double x) => x.roundToDouble();
-  static double sign(double x) => x.sign;
-
-  static double factorial(double n) {
-    if (n < 0 || n != n.roundToDouble() || n > 170) return double.nan;
-    var r = 1.0;
-    for (var i = 2; i <= n.round(); i++) {
-      r *= i;
-    }
-    return r;
-  }
-
-  /// Evalue une fonction unaire par nom
-  static double call1(String name, double a) {
-    switch (name) {
-      case 'sin':
-        return sin(a);
-      case 'cos':
-        return cos(a);
-      case 'tan':
-        return tan(a);
-      case 'sec':
-        return sec(a);
-      case 'csc':
-        return csc(a);
-      case 'cot':
-        return cot(a);
-      case 'asin':
-      case 'arsin':
-        return asin(a);
-      case 'acos':
-      case 'arcos':
-        return acos(a);
-      case 'atan':
-      case 'artan':
-        return atan(a);
-      case 'acot':
-      case 'arcotan':
-        return acot(a);
-      case 'sinh':
-      case 'sh':
-        return sinh(a);
-      case 'cosh':
-      case 'ch':
-        return cosh(a);
-      case 'tanh':
-      case 'th':
-        return tanh(a);
-      case 'asinh':
-      case 'agsh':
-        return asinh(a);
-      case 'acosh':
-      case 'agch':
-        return acosh(a);
-      case 'atanh':
-      case 'agth':
-        return atanh(a);
-      case 'sqrt':
-        return sqrt(a);
-      case 'cbrt':
-        return cbrt(a);
-      case 'abs':
-        return abs(a);
-      case 'exp':
-        return exp(a);
-      case 'ln':
-      case 'log':
-        return ln(a);
-      case 'log10':
-        return log10(a);
-      case 'log2':
-        return log2(a);
-      case 'floor':
-        return floor(a);
-      case 'ceil':
-        return ceil(a);
-      case 'round':
-        return round(a);
-      case 'sign':
-        return sign(a);
-      case 'fact':
-      case 'factorial':
-        return factorial(a);
-      default:
-        return double.nan;
-    }
-  }
-
-  /// Nettoyage d'une expression utilisateur (clavier, symboles, π…)
-  static String normalizeExpression(String input) {
-    var s = input
-        .replaceAll('×', '*')
-        .replaceAll('·', '*')
-        .replaceAll('÷', '/')
-        .replaceAll('−', '-')
-        .replaceAll('–', '-')
-        .replaceAll('π', 'pi')
-        .replaceAll('Π', 'pi')
-        .replaceAll('√', 'sqrt')
-        .replaceAll('²', '^2')
-        .replaceAll('³', '^3')
-        .replaceAll(',', '.')
-        .replaceAll(' ', '')
-        .replaceAll('{', '(')
-        .replaceAll('}', ')')
-        .replaceAll('[', '(')
-        .replaceAll(']', ')');
-
-    s = s
-        .replaceAll(RegExp(r'\bIn\b'), 'ln')
-        .replaceAll(RegExp(r'\bIN\b'), 'ln')
-        .replaceAll(RegExp(r'\bLn\b'), 'ln');
-
-    s = s.toLowerCase();
-
-    s = s.replaceAllMapped(RegExp(r'(\d+(?:\.\d+)?)!'), (m) {
-      return 'fact(${m.group(1)})';
-    });
-
-    s = s.replaceAllMapped(RegExp(r'(\d+(?:\.\d+)?)%'), (m) {
-      return '(${m.group(1)}/100)';
-    });
-
-    s = _insertImplicitMultiplication(s);
-    return s;
-  }
-
-  static String _insertImplicitMultiplication(String source) {
-    final tokens = _tokenize(source);
-    final out = <String>[];
-    for (var i = 0; i < tokens.length; i++) {
-      final current = tokens[i];
-      if (out.isNotEmpty &&
-          _endsValue(out.last) &&
-          _startsValue(current) &&
-          !(out.last == ')' && current == '(') &&
-          !(functionNames.contains(out.last) && current == '(')) {
-        if (!functionNames.contains(out.last)) {
-          out.add('*');
-        }
-      }
-      out.add(current);
-    }
-    return out.join();
-  }
-
-  static List<String> _tokenize(String source) {
-    final result = <String>[];
-    var i = 0;
-    while (i < source.length) {
-      final c = source[i];
-      if ('0123456789.'.contains(c)) {
-        final start = i++;
-        while (i < source.length && '0123456789.eE+-'.contains(source[i])) {
-          if ((source[i] == '+' || source[i] == '-') &&
-              i > start &&
-              source[i - 1] != 'e' &&
-              source[i - 1] != 'E') {
-            break;
-          }
-          i++;
-        }
-        result.add(source.substring(start, i));
-      } else if (RegExp(r'[a-zA-Z_]').hasMatch(c)) {
-        final start = i++;
-        while (
-            i < source.length && RegExp(r'[a-zA-Z_0-9]').hasMatch(source[i])) {
-          i++;
-        }
-        result.add(source.substring(start, i));
-      } else if ('+-*/^(),'.contains(c)) {
-        result.add(c);
-        i++;
-      } else {
-        i++;
-      }
-    }
-    return result;
-  }
-
-  static bool _endsValue(String token) =>
-      token == ')' ||
-      double.tryParse(token) != null ||
-      token == 'x' ||
-      token == 'pi' ||
-      token == 'e' ||
-      token == 'tau';
-
-  static bool _startsValue(String token) =>
-      token == '(' ||
-      double.tryParse(token) != null ||
-      token == 'x' ||
-      token == 'pi' ||
-      token == 'e' ||
-      token == 'tau' ||
-      functionNames.contains(token);
-
-  /// Arrondi propre : cos(pi) → -1, sin(pi) → 0
   static double clean(double v) {
     if (v.isNaN || v.isInfinite) return v;
-    if (v.abs() < epsilon) return 0;
     final r = v.roundToDouble();
     if ((v - r).abs() < 1e-10) return r;
     return v;
   }
 
+  static double pow(double a, double b) => math.pow(a, b).toDouble();
+  static double log10(double x) => math.log(x) / math.ln10;
+  static double ln(double x) => math.log(x);
+
+  static double call1(String name, double a) {
+    switch (name) {
+      case 'sin':
+        return math.sin(a);
+      case 'cos':
+        return math.cos(a);
+      case 'tan':
+        return math.tan(a);
+      case 'asin':
+        return math.asin(a);
+      case 'acos':
+        return math.acos(a);
+      case 'atan':
+        return math.atan(a);
+      case 'sinh':
+        return (math.exp(a) - math.exp(-a)) / 2;
+      case 'cosh':
+        return (math.exp(a) + math.exp(-a)) / 2;
+      case 'tanh':
+        final e2 = math.exp(2 * a);
+        return (e2 - 1) / (e2 + 1);
+      case 'log':
+      case 'ln':
+        return math.log(a);
+      case 'log10':
+        return log10(a);
+      case 'exp':
+        return math.exp(a);
+      case 'sqrt':
+        return math.sqrt(a);
+      case 'cbrt':
+        return a >= 0
+            ? math.pow(a, 1 / 3).toDouble()
+            : -math.pow(-a, 1 / 3).toDouble();
+      case 'abs':
+        return a.abs();
+    }
+    return double.nan;
+  }
+
+  /// Normalise 2x → 2*x, ln → log, ^, π…
+  static String normalizeExpression(String input) {
+    var s = input.trim();
+    s = s.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
+    s = s.replaceAll('π', 'pi').replaceAll('Π', 'pi');
+    s = s.replaceAllMapped(RegExp(r'\bln\s*\('), (_) => 'log(');
+    s = s.replaceAllMapped(RegExp(r'\bin\s*\('), (_) => 'log(');
+    // multiplication implicite
+    s = s.replaceAllMapped(
+      RegExp(r'(\d)\s*([a-zA-Z(])'),
+      (m) => '${m[1]}*${m[2]}',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\)\s*(\d)'),
+      (m) => ')*${m[1]}',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\)\s*([a-zA-Z(])'),
+      (m) => ')*${m[1]}',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'(\d)\s*pi\b'),
+      (m) => '${m[1]}*pi',
+    );
+    return s;
+  }
+
+  /// Affichage : entier si possible, sinon fraction simplifiée (2/2 → 1).
   static String format(double v) {
-    if (v.isNaN) return 'Indefini';
+    if (v.isNaN) return 'Erreur mathématique';
     if (v.isInfinite) return v.isNegative ? '-∞' : '+∞';
     final c = clean(v);
     if (c == c.roundToDouble() && c.abs() < 1e15) {
       return c.toInt().toString();
     }
-    return toSimpleFraction(c) ?? c.toString();
+    return toSimpleFraction(c) ?? _trimDecimal(c);
+  }
+
+  static String _trimDecimal(double c) {
+    var s = c.toStringAsFixed(10);
+    s = s.replaceFirst(RegExp(r'\.?0+$'), '');
+    return s;
   }
 
   static String? toSimpleFraction(double value) {
@@ -364,11 +128,41 @@ class MathLibrary {
         return '$n/$d';
       }
     }
+    if (bestError > 1e-6) return null;
     final g = _gcd(bestNumerator.abs(), bestDenominator);
     final n = bestNumerator ~/ g;
     final d = bestDenominator ~/ g;
     if (d == 1) return n.toString();
     return '$n/$d';
+  }
+
+  /// Argument en fraction de π (ex. π/3, −π/2, 3π/4).
+  static String formatArgAsPi(double arg) {
+    if (arg.isNaN) return 'Erreur mathématique';
+    var a = arg;
+    while (a > math.pi) {
+      a -= 2 * math.pi;
+    }
+    while (a <= -math.pi) {
+      a += 2 * math.pi;
+    }
+    if (a.abs() < 1e-10) return '0';
+    final r = a / math.pi;
+    final frac = toSimpleFraction(r);
+    if (frac == null) return '${format(a)} rad';
+    if (frac == '1') return 'π';
+    if (frac == '-1') return '−π';
+    if (frac.contains('/')) {
+      final p = frac.split('/');
+      final n = p[0];
+      final d = p[1];
+      if (n == '1') return 'π/$d';
+      if (n == '-1') return '−π/$d';
+      return '$nπ/$d';
+    }
+    // entier k → kπ
+    if (frac.startsWith('-')) return '−${frac.substring(1)}π';
+    return '${frac}π';
   }
 
   static int _gcd(int a, int b) {

@@ -16,16 +16,15 @@ class StatisticsScreen extends StatefulWidget {
 }
 
 class _StatisticsScreenState extends State<StatisticsScreen> {
-  /// '1d' | '2d' | 'grouped'
   String _mode = 'grouped';
   int _n = 5;
   int _nClasses = 4;
 
   late List<TextEditingController> _xCtrls;
   late List<TextEditingController> _yCtrls;
-  late List<TextEditingController> _aCtrls; // borne inf classe
-  late List<TextEditingController> _bCtrls; // borne sup
-  late List<TextEditingController> _niCtrls; // effectifs
+  late List<TextEditingController> _aCtrls;
+  late List<TextEditingController> _bCtrls;
+  late List<TextEditingController> _niCtrls;
 
   final _seriesCtrl = TextEditingController();
   String _result = '';
@@ -45,7 +44,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   void _rebuildGrouped() {
-    // Exemple : [0;10[ n=5, [10;20[ n=8, …
     _aCtrls = List.generate(
         _nClasses, (i) => TextEditingController(text: '${i * 10}'));
     _bCtrls = List.generate(
@@ -191,7 +189,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     });
   }
 
-  /// Séries groupées : classes [aᵢ ; bᵢ[
   void _calculateGrouped(LocaleProvider loc) {
     final a = <double>[];
     final b = <double>[];
@@ -217,8 +214,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
 
     final k = a.length;
-    final c = List<double>.generate(k, (i) => (a[i] + b[i]) / 2); // centres
-    final w = List<double>.generate(k, (i) => b[i] - a[i]); // amplitudes
+    final c = List<double>.generate(k, (i) => (a[i] + b[i]) / 2);
+    final w = List<double>.generate(k, (i) => b[i] - a[i]);
     final N = ni.reduce((x, y) => x + y);
     if (N <= 0) {
       setState(() {
@@ -230,13 +227,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
     final nici = List<double>.generate(k, (i) => ni[i] * c[i]);
     final nici2 = List<double>.generate(k, (i) => ni[i] * c[i] * c[i]);
-    final fi = List<double>.generate(k, (i) => ni[i] / N); // fréquences
+    final fi = List<double>.generate(k, (i) => ni[i] / N);
     final dens = List<double>.generate(
-        k, (i) => w[i] > 0 ? ni[i] / w[i] : double.nan); // densités d'effectifs
-    final densF = List<double>.generate(
-        k, (i) => w[i] > 0 ? fi[i] / w[i] : double.nan);
+        k, (i) => w[i] > 0 ? ni[i] / w[i] : double.nan);
 
-    // ECC / ECD
     final ecc = List<double>.filled(k, 0);
     final ecd = List<double>.filled(k, 0);
     ecc[0] = ni[0];
@@ -250,14 +244,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final fec = ecc.map((e) => e / N).toList();
     final fcd = ecd.map((e) => e / N).toList();
 
-    // Moyenne (point moyen 1D : (x̄, 0) ou juste x̄)
     final sumNiCi = nici.reduce((x, y) => x + y);
     final mean = sumNiCi / N;
     final sumNiCi2 = nici2.reduce((x, y) => x + y);
     final variance = sumNiCi2 / N - mean * mean;
     final std = math.sqrt(variance.abs());
 
-    // Classe médiane : plus petit i tel que ECC ≥ N/2
     final half = N / 2;
     var medIdx = 0;
     for (var i = 0; i < k; i++) {
@@ -267,10 +259,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       }
     }
     final fPrev = medIdx == 0 ? 0.0 : ecc[medIdx - 1];
-    final median = a[medIdx] +
-        ((half - fPrev) / ni[medIdx]) * w[medIdx];
+    final median =
+        a[medIdx] + ((half - fPrev) / ni[medIdx]) * w[medIdx];
 
-    // Classe modale : max densité (ou max nᵢ si amplitudes égales)
     var modIdx = 0;
     for (var i = 1; i < k; i++) {
       final di = dens[i].isFinite ? dens[i] : ni[i];
@@ -291,7 +282,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     buf.writeln('N = ${_fmt(N)}');
     buf.writeln();
     buf.writeln(
-        'i | [a ; b[ | cᵢ | nᵢ | nᵢcᵢ | nᵢcᵢ² | wᵢ | fᵢ | dens | ECC | ECD | FEC | FCD');
+        'i | [a;b[ | cᵢ | nᵢ | nᵢcᵢ | nᵢcᵢ² | wᵢ | fᵢ | dens | ECC | ECD | FEC | FCD');
     for (var i = 0; i < k; i++) {
       buf.writeln(
           '${i + 1} | [${_fmt(a[i])} ; ${_fmt(b[i])}[ | ${_fmt(c[i])} | ${_fmt(ni[i])} | '
@@ -306,15 +297,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     buf.writeln(
         '${loc.t('Classe médiane', 'Median class')} : [${_fmt(a[medIdx])} ; ${_fmt(b[medIdx])}[');
     buf.writeln(
-        '${loc.t('Médiane', 'Median')} ≈ a + ((N/2 − ECC₋₁)/nᵢ)·w = ${_fmt(median)}');
+        '${loc.t('Médiane', 'Median')} ≈ ${_fmt(median)}');
     buf.writeln(
         '${loc.t('Classe modale', 'Modal class')} : [${_fmt(a[modIdx])} ; ${_fmt(b[modIdx])}[');
-    buf.writeln(
-        '${loc.t('Mode', 'Mode')} ≈ ${_fmt(mode)}');
+    buf.writeln('${loc.t('Mode', 'Mode')} ≈ ${_fmt(mode)}');
     buf.writeln();
     buf.writeln(
-        '${loc.t('Point moyen du nuage (série 1D groupée)', 'Mean point of the cloud (1D grouped)')} :');
-    buf.writeln('  G(${_fmt(mean)} ; 0)  ${loc.t('(abscisse = moyenne)', '(x = mean)')}');
+        '${loc.t('Point moyen du nuage', 'Mean point of the cloud')} : G(${_fmt(mean)} ; 0)');
 
     setState(() {
       _result =
@@ -356,11 +345,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             child: SegmentedButton<String>(
               segments: [
                 ButtonSegment(
-                    value: '1d',
-                    label: Text(loc.t('Série', 'Series'))),
+                    value: '1d', label: Text(loc.t('Série', 'Series'))),
                 ButtonSegment(
-                    value: '2d',
-                    label: Text(loc.t('x / y', 'x / y'))),
+                    value: '2d', label: Text(loc.t('x / y', 'x / y'))),
                 ButtonSegment(
                     value: 'grouped',
                     label: Text(loc.t('Groupées', 'Grouped'))),

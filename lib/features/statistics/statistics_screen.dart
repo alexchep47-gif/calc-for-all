@@ -24,6 +24,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   final _seriesCtrl = TextEditingController();
   final _targetMeanCtrl = TextEditingController();
   final _classWidthCtrl = TextEditingController(text: '1');
+  final _targetMeanXCtrl = TextEditingController();
+  final _targetMeanYCtrl = TextEditingController();
+  final _classWidthXCtrl = TextEditingController(text: '1');
+  final _classWidthYCtrl = TextEditingController(text: '1');
   String _result = '';
   String _steps = '';
 
@@ -50,6 +54,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     _seriesCtrl.dispose();
     _targetMeanCtrl.dispose();
     _classWidthCtrl.dispose();
+    _targetMeanXCtrl.dispose();
+    _targetMeanYCtrl.dispose();
+    _classWidthXCtrl.dispose();
+    _classWidthYCtrl.dispose();
     super.dispose();
   }
 
@@ -184,12 +192,33 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void _calculate2d(LocaleProvider loc) {
     final xs = <double>[];
     final ys = <double>[];
+    var unknownX = 0;
+    var unknownY = 0;
     for (var i = 0; i < _n; i++) {
       final x = _parse(_xCtrls[i].text);
       final y = _parse(_yCtrls[i].text);
-      if (x == null || y == null) continue;
-      xs.add(x);
-      ys.add(y);
+      final xUnknown = x == null && _xCtrls[i].text.trim() == '?';
+      final yUnknown = y == null && _yCtrls[i].text.trim() == '?';
+      if (x != null) xs.add(x); else if (xUnknown) unknownX++;
+      if (y != null) ys.add(y); else if (yUnknown) unknownY++;
+    }
+    final targetX = _parse(_targetMeanXCtrl.text);
+    final targetY = _parse(_targetMeanYCtrl.text);
+    if (unknownX > 0) {
+      if (targetX == null) {
+        setState(() { _result = loc.t('Moyenne cible de x requise pour les inconnues.', 'Target mean of x is required.'); _steps = ''; });
+        return;
+      }
+      final value = (targetX * _n - xs.fold<double>(0, (a, b) => a + b)) / unknownX;
+      xs.addAll(List<double>.filled(unknownX, value));
+    }
+    if (unknownY > 0) {
+      if (targetY == null) {
+        setState(() { _result = loc.t('Moyenne cible de y requise pour les inconnues.', 'Target mean of y is required.'); _steps = ''; });
+        return;
+      }
+      final value = (targetY * _n - ys.fold<double>(0, (a, b) => a + b)) / unknownY;
+      ys.addAll(List<double>.filled(unknownY, value));
     }
     if (xs.length < 2) {
       setState(() {
@@ -321,6 +350,27 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     buf.writeln(loc.t(
         'Droite des moindres carrés orthogonaux non détaillée ici.',
         'Orthogonal least-squares line not detailed here.'));
+    String cumulativeTable(String name, List<double> data, double width) {
+      final counts = <double, int>{};
+      for (final value in data) {
+        final key = counts.keys.firstWhere((k) => (k - value).abs() < MathLibrary.epsilon, orElse: () => value);
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+      final modes = counts.keys.toList()..sort();
+      var ecc = 0;
+      final out = StringBuffer('— $name —\nxᵢ | nᵢ | fᵢ | ECC | ECD | FCC | FCD\n');
+      for (final value in modes) {
+        ecc += counts[value]!;
+        final ecd = counts.entries.where((e) => e.key >= value - MathLibrary.epsilon).fold<int>(0, (a, e) => a + e.value);
+        out.writeln('${_fmt(value)} | ${counts[value]} | ${_fmt(counts[value]! / data.length)} | $ecc | $ecd | ${_fmt(ecc / data.length)} | ${_fmt(ecd / data.length)}');
+      }
+      final modal = modes.reduce((a, b) => counts[a]! >= counts[b]! ? a : b);
+      out.writeln('${loc.t('Classe modale', 'Modal class')} : [${_fmt(modal - width / 2)} ; ${_fmt(modal + width / 2)}[');
+      return out.toString();
+    }
+    buf.writeln();
+    buf.writeln(cumulativeTable(loc.t('Série marginale x', 'Marginal x series'), xs, _parse(_classWidthXCtrl.text) ?? 1));
+    buf.writeln(cumulativeTable(loc.t('Série marginale y', 'Marginal y series'), ys, _parse(_classWidthYCtrl.text) ?? 1));
 
     setState(() {
       _result = loc.t(
@@ -446,6 +496,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               ),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: TextField(controller: _targetMeanXCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Moyenne cible x', 'Target mean x'), border: const OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: _targetMeanYCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Moyenne cible y', 'Target mean y'), border: const OutlineInputBorder()))),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: TextField(controller: _classWidthXCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Amplitude x', 'Width x'), border: const OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: _classWidthYCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Amplitude y', 'Width y'), border: const OutlineInputBorder()))),
+            ]),
+            const SizedBox(height: 6),
+            Text(loc.t('Utilisez ? dans une cellule pour une inconnue xᵢ ou yᵢ.', 'Use ? in a cell for an unknown xᵢ or yᵢ.'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             const SizedBox(height: 8),
             Row(
               children: [

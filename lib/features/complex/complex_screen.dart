@@ -21,6 +21,10 @@ class _ComplexScreenState extends State<ComplexScreen> {
   String _extra = '';
   List<ComplexNumber> _points = [];
   ComplexNumber? _resultPoint;
+  final _rootIndexCtrl = TextEditingController(text: '3');
+  final _linearizeCtrl = TextEditingController(text: 'sin(x)^3');
+  List<ComplexNumber> _roots = [];
+  String _linearized = '';
 
   @override
   void initState() {
@@ -43,10 +47,42 @@ class _ComplexScreenState extends State<ComplexScreen> {
       c.dispose();
     }
     super.dispose();
+    _rootIndexCtrl.dispose();
+    _linearizeCtrl.dispose();
   }
 
   List<ComplexNumber?> _parseAll() =>
       _ctrls.map((c) => _service.parse(c.text)).toList();
+
+  void _computeRoots() {
+    final z = _service.parse(_ctrls.first.text);
+    final n = int.tryParse(_rootIndexCtrl.text) ?? 3;
+    if (z == null || n < 2) return;
+    final radius = math.pow(z.modulus, 1 / n).toDouble();
+    final roots = List.generate(n, (k) {
+      final angle = (z.argument + 2 * math.pi * k) / n;
+      return ComplexNumber(radius * math.cos(angle), radius * math.sin(angle));
+    });
+    setState(() {
+      _roots = roots;
+      _points = roots;
+      _resultPoint = null;
+      _result = roots.asMap().entries.map((e) => 'z${e.key + 1} = ${e.value}').join('\n');
+      _extra = 'Racines de degré $n : module = ${MathLibrary.format(radius)}';
+    });
+  }
+
+  void _linearize() {
+    final expression = _linearizeCtrl.text.toLowerCase().replaceAll(' ', '');
+    final result = switch (expression) {
+      'sin(x)^2' => 'sin²(x) = (1 − cos(2x))/2',
+      'cos(x)^2' => 'cos²(x) = (1 + cos(2x))/2',
+      'sin(x)^3' => 'sin³(x) = (3sin(x) − sin(3x))/4',
+      'cos(x)^3' => 'cos³(x) = (3cos(x) + cos(3x))/4',
+      _ => 'Formules : sin²(x), cos²(x), sin³(x), cos³(x).',
+    };
+    setState(() => _linearized = result);
+  }
 
   void _compute(String op) {
     final parsed = _parseAll();
@@ -206,6 +242,14 @@ class _ComplexScreenState extends State<ComplexScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              Expanded(child: TextField(controller: _rootIndexCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Indice n', border: OutlineInputBorder(), isDense: true))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: _linearizeCtrl, decoration: const InputDecoration(labelText: 'Expression trigonométrique', border: OutlineInputBorder(), isDense: true))),
+            ]),
+          ),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -216,8 +260,12 @@ class _ComplexScreenState extends State<ComplexScreen> {
                   label: Text(op),
                   onPressed: () => _compute(op),
                 ),
+              ActionChip(label: const Text('Racines n-ièmes'), onPressed: _computeRoots),
+              ActionChip(label: const Text('Linéariser'), onPressed: _linearize),
             ],
           ),
+          if (_linearized.isNotEmpty)
+            Padding(padding: const EdgeInsets.all(8), child: Text(_linearized, style: const TextStyle(fontWeight: FontWeight.bold))),
           if (_result.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(12),
@@ -247,6 +295,7 @@ class _ComplexScreenState extends State<ComplexScreen> {
                 painter: _ComplexPlanePainter(
                   points: _points,
                   result: _resultPoint,
+                  roots: _roots,
                 ),
                 child: const SizedBox.expand(),
               ),
@@ -261,8 +310,9 @@ class _ComplexScreenState extends State<ComplexScreen> {
 class _ComplexPlanePainter extends CustomPainter {
   final List<ComplexNumber> points;
   final ComplexNumber? result;
+  final List<ComplexNumber> roots;
 
-  _ComplexPlanePainter({required this.points, this.result});
+  _ComplexPlanePainter({required this.points, this.result, this.roots = const []});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -273,8 +323,24 @@ class _ComplexPlanePainter extends CustomPainter {
     final axis = Paint()
       ..color = Colors.grey.shade400
       ..strokeWidth = 1;
+    final grid = Paint()
+      ..color = Colors.grey.withOpacity(0.18)
+      ..strokeWidth = 1;
+    for (var i = -6; i <= 6; i++) {
+      final x = cx + i * scale;
+      final y = cy - i * scale;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+      if (i != 0) {
+        final text = TextPainter(text: TextSpan(text: '$i', style: const TextStyle(fontSize: 10, color: Colors.grey)), textDirection: TextDirection.ltr)..layout();
+        text.paint(canvas, Offset(x + 2, cy + 2));
+        text.paint(canvas, Offset(cx + 2, y + 2));
+      }
+    }
     canvas.drawLine(Offset(0, cy), Offset(size.width, cy), axis);
     canvas.drawLine(Offset(cx, 0), Offset(cx, size.height), axis);
+    final label = TextPainter(text: const TextSpan(text: 'O   u →   v ↑', style: TextStyle(fontSize: 12, color: Colors.black87)), textDirection: TextDirection.ltr)..layout();
+    label.paint(canvas, const Offset(8, 8));
 
     final colors = [
       Colors.blue,
@@ -297,6 +363,10 @@ class _ComplexPlanePainter extends CustomPainter {
       final p =
           Offset(cx + result!.real * scale, cy - result!.imag * scale);
       canvas.drawCircle(p, 8, Paint()..color = Colors.red);
+    }
+    for (final root in roots) {
+      final p = Offset(cx + root.real * scale, cy - root.imag * scale);
+      canvas.drawCircle(p, 5, Paint()..color = Colors.redAccent);
     }
   }
 

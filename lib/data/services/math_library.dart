@@ -23,12 +23,26 @@ class MathLibrary {
     'csc',
     'cot',
     'asin',
+    'arsin',
     'acos',
+    'arcos',
     'atan',
+    'artan',
+    'acot',
+    'arcotan',
     'atan2',
     'sinh',
+    'sh',
     'cosh',
+    'ch',
     'tanh',
+    'th',
+    'asinh',
+    'agsh',
+    'acosh',
+    'agch',
+    'atanh',
+    'agth',
     'sqrt',
     'cbrt',
     'abs',
@@ -64,8 +78,13 @@ class MathLibrary {
     return s.abs() < epsilon ? double.nan : math.cos(x) / s;
   }
   static double asin(double x) => x.abs() <= 1 ? math.asin(x) : double.nan;
+  static double arsin(double x) => asin(x);
   static double acos(double x) => x.abs() <= 1 ? math.acos(x) : double.nan;
+  static double arcos(double x) => acos(x);
   static double atan(double x) => math.atan(x);
+  static double artan(double x) => atan(x);
+  static double acot(double x) => x == 0 ? math.pi / 2 : math.atan(1 / x) + (x < 0 ? math.pi : 0);
+  static double arcotan(double x) => acot(x);
   static double atan2(double y, double x) => math.atan2(y, x);
 
   /// Hyperboliques (implementes a la main : absents de dart:math sur SDK 3.x)
@@ -91,6 +110,10 @@ class MathLibrary {
     final e2 = math.exp(2 * x);
     return (e2 - 1) / (e2 + 1);
   }
+
+  static double asinh(double x) => math.log(x + math.sqrt(x * x + 1));
+  static double acosh(double x) => x < 1 ? double.nan : math.log(x + math.sqrt(x * x - 1));
+  static double atanh(double x) => x.abs() >= 1 ? double.nan : 0.5 * math.log((1 + x) / (1 - x));
 
   static double sqrt(double x) => x >= 0 ? math.sqrt(x) : double.nan;
   static double cbrt(double x) =>
@@ -131,17 +154,35 @@ class MathLibrary {
       case 'cot':
         return cot(a);
       case 'asin':
+      case 'arsin':
         return asin(a);
       case 'acos':
+      case 'arcos':
         return acos(a);
       case 'atan':
+      case 'artan':
         return atan(a);
+      case 'acot':
+      case 'arcotan':
+        return acot(a);
       case 'sinh':
+      case 'sh':
         return sinh(a);
       case 'cosh':
+      case 'ch':
         return cosh(a);
       case 'tanh':
+      case 'th':
         return tanh(a);
+      case 'asinh':
+      case 'agsh':
+        return asinh(a);
+      case 'acosh':
+      case 'agch':
+        return acosh(a);
+      case 'atanh':
+      case 'agth':
+        return atanh(a);
       case 'sqrt':
         return sqrt(a);
       case 'cbrt':

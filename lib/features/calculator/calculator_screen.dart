@@ -111,6 +111,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           _expression += 'cot(';
           _shift = false;
           break;
+        case 'arsin':
+        case 'arcos':
+        case 'artan':
+        case 'arcotan':
+        case 'sh':
+        case 'ch':
+        case 'th':
+        case 'agsh':
+        case 'agch':
+        case 'agth':
+          _expression += '$value(';
+          _shift = false;
+          break;
         case 'sin':
           _expression += _shift ? 'asin(' : 'sin(';
           _shift = false;
@@ -402,6 +415,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   _buildRow(['1', '2', '3', '+']),
                   _buildRow(['0', ',', 'π', '=']),
                   _buildRow([_shift ? 'sec' : 'sin', _shift ? 'csc' : 'cos', _shift ? 'cot' : 'tan', '√']),
+                  _buildRow([_shift ? 'arsin' : 'sh', _shift ? 'arcos' : 'ch', _shift ? 'artan' : 'th', _shift ? 'arcotan' : 'agsh']),
+                  _buildRow([_shift ? 'agsh' : 'agch', _shift ? 'agch' : 'agth', 'agth', 'sec']),
                   _buildRow(['log', 'ln', 'xʸ', 'ⁿ√']),
                   _buildRow(['(', ')', 'e', '!']),
                   _buildRow(['C', '⌫', '.', '%']),

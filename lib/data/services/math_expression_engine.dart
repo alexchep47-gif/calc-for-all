@@ -629,6 +629,7 @@ class _Function extends _Node {
           d,
         );
       case 'asin':
+      case 'arsin':
         return _Binary(
           '/',
           d,
@@ -638,6 +639,7 @@ class _Function extends _Node {
           ),
         );
       case 'acos':
+      case 'arcos':
         return _Unary(
           '-',
           _Binary(
@@ -650,21 +652,45 @@ class _Function extends _Node {
           ),
         );
       case 'atan':
+      case 'artan':
         return _Binary(
           '/',
           d,
           _Binary('+', _Number(1), _Binary('^', argument, _Number(2))),
         );
       case 'sinh':
+      case 'sh':
         return _Binary('*', _Function('cosh', argument), d);
       case 'cosh':
+      case 'ch':
         return _Binary('*', _Function('sinh', argument), d);
       case 'tanh':
+      case 'th':
         return _Binary(
           '/',
           d,
           _Binary('^', _Function('cosh', argument), _Number(2)),
         );
+      case 'asinh':
+      case 'agsh':
+        return _Binary(
+          '/',
+          d,
+          _Function('sqrt', _Binary('+', _Binary('^', argument, _Number(2)), _Number(1))),
+        );
+      case 'acosh':
+      case 'agch':
+        return _Binary(
+          '/',
+          d,
+          _Function('sqrt', _Binary('-', _Binary('^', argument, _Number(2)), _Number(1))),
+        );
+      case 'atanh':
+      case 'agth':
+        return _Binary('/', d, _Binary('-', _Number(1), _Binary('^', argument, _Number(2))));
+      case 'acot':
+      case 'arcotan':
+        return _Unary('-', _Binary('/', d, _Binary('+', _Number(1), _Binary('^', argument, _Number(2)))));
       case 'log10':
         return _Binary(
           '/',

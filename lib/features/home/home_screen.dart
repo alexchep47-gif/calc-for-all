@@ -36,8 +36,7 @@ class HomeScreen extends StatelessWidget {
             AppRoutes.solver),
         _Module(
             loc.t('Systèmes & Inéquations', 'Systems & Inequalities'),
-            loc.t('Systèmes linéaires + inéquations',
-                'Linear systems + inequalities'),
+            loc.t('Lié au graphique', 'Linked to graph'),
             Icons.account_tree_rounded,
             const Color(0xFF5C6BC0),
             AppRoutes.systems),
@@ -86,20 +85,20 @@ class HomeScreen extends StatelessWidget {
             AppRoutes.probability),
         _Module(
             loc.t('Statistiques', 'Statistics'),
-            loc.t('Régressions · corrélation · Mayer',
-                'Regression · correlation · Mayer'),
+            loc.t('Groupées · régressions · Mayer',
+                'Grouped · regression · Mayer'),
             Icons.bar_chart_rounded,
             const Color(0xFFEF6C00),
             AppRoutes.statistics),
         _Module(
             loc.t('OCR', 'OCR'),
-            loc.t('Lecture hors ligne', 'Offline reading'),
-            Icons.document_scanner_rounded,
-            const Color(0xFF7B1FA2),
+            loc.t('Lire puis calculer', 'Read then compute'),
+            Icons.document_scanner_outlined,
+            const Color(0xFF00897B),
             AppRoutes.ocr),
         _Module(
             loc.t('Complexes', 'Complex numbers'),
-            loc.t('Module, argument, plan', 'Modulus, argument, plane'),
+            loc.t('Module, arg en π', 'Modulus, arg as π'),
             Icons.blur_on_rounded,
             const Color(0xFFAD1457),
             AppRoutes.complex),
@@ -110,25 +109,24 @@ class HomeScreen extends StatelessWidget {
             const Color(0xFF455A64),
             AppRoutes.converter),
         _Module(
-            loc.t('Historique', 'History'),
-            loc.t('Calculs récents', 'Recent calculations'),
-            Icons.history_rounded,
-            const Color(0xFF546E7A),
-            AppRoutes.history),
+            loc.t('Paramètres', 'Settings'),
+            loc.t('Thème, langue, affichage', 'Theme, language, display'),
+            Icons.settings_rounded,
+            const Color(0xFF607D8B),
+            AppRoutes.settings),
       ];
 
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocaleProvider>();
-    final storage = context.watch<LocalStorage>();
     final modules = _modules(loc);
-    final favorites = storage.favoriteModules;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.t('Calc For All', 'Calc For All')),
+        title: const Text('Calc For All'),
         actions: [
           IconButton(
+            tooltip: loc.t('Historique', 'History'),
             icon: const Icon(Icons.history),
             onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
           ),
@@ -140,29 +138,7 @@ class HomeScreen extends StatelessWidget {
       ),
       body: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text(
-                loc.t('Modules', 'Modules'),
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          if (favorites.isNotEmpty)
-            ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Text(
-                    loc.t('Favoris', 'Favorites'),
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.grey.shade600),
-                  ),
-                ),
-              ),
-            ],
+          SnippetHeader(loc: loc),
           SliverPadding(
             padding: const EdgeInsets.all(12),
             sliver: SliverGrid(
@@ -185,6 +161,23 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class SnippetHeader extends StatelessWidget {
+  final LocaleProvider loc;
+  const SnippetHeader({super.key, required this.loc});
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: Text(
+          loc.t('Modules', 'Modules'),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -245,4 +238,3 @@ class _ModuleCard extends StatelessWidget {
     );
   }
 }
-

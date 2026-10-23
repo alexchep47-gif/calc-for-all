@@ -83,38 +83,54 @@ class SettingsScreen extends StatelessWidget {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: Text(isFr ? 'À propos' : 'About'),
+            title: Text(isFr ? 'À propos / Licences' : 'About / Licenses'),
             subtitle:
                 Text('${AppConstants.appName} v${AppConstants.appVersion}'),
             onTap: () {
-              // Dialogue personnalisé — sans "Powered by Flutter"
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: Text(AppConstants.appName),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Version ${AppConstants.appVersion}',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(AppConstants.appDescription),
-                      const SizedBox(height: 16),
-                      const Text(
-                        '© 2026 — Calc For All',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        isFr
-                            ? 'Application éducative hors ligne.\nAucune publicité.'
-                            : 'Offline educational app.\nNo ads.',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ],
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Version ${AppConstants.appVersion}',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(AppConstants.appDescription),
+                        const SizedBox(height: 16),
+                        Text(
+                          isFr ? 'Créateur' : 'Creator',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'NEMMEGNE CHEPING ALEXANDRE MERVIN',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          isFr
+                              ? 'Nationalité : camerounaise'
+                              : 'Nationality: Cameroonian',
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '© 2026 — Calc For All',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          isFr
+                              ? 'Application éducative hors ligne. Aucune publicité.'
+                              : 'Offline educational app. No ads.',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
                   actions: [
                     TextButton(

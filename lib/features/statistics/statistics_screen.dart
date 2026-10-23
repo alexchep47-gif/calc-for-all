@@ -22,6 +22,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   late List<TextEditingController> _xCtrls;
   late List<TextEditingController> _yCtrls;
   final _seriesCtrl = TextEditingController();
+  final _targetMeanCtrl = TextEditingController();
+  final _classWidthCtrl = TextEditingController(text: '1');
   String _result = '';
   String _steps = '';
 
@@ -46,6 +48,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       c.dispose();
     }
     _seriesCtrl.dispose();
+    _targetMeanCtrl.dispose();
+    _classWidthCtrl.dispose();
     super.dispose();
   }
 
@@ -81,12 +85,35 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   void _calculate1d(LocaleProvider loc) {
-    final parts =
-        _seriesCtrl.text.trim().split(RegExp(r'[\s,;]+')).where((e) => e.isNotEmpty);
+    final parts = _seriesCtrl.text
+        .trim()
+        .split(RegExp(r'[\s,;]+'))
+        .where((e) => e.isNotEmpty)
+        .toList();
     final values = <double>[];
+    final unknownCount = parts.where((p) =>
+        RegExp(r'^(\?|x|inconnue)$', caseSensitive: false).hasMatch(p)).length;
+    double? resolvedUnknown;
     for (final p in parts) {
       final v = _parse(p);
       if (v != null) values.add(v);
+    }
+    if (unknownCount > 0) {
+      final target = _parse(_targetMeanCtrl.text);
+      if (target == null) {
+        setState(() {
+          _result = loc.t('Indiquez la moyenne cible pour déterminer les inconnues.',
+              'Enter a target mean to determine the unknowns.');
+          _steps = loc.t(
+              'Une ou plusieurs valeurs sont notées ?. Avec plusieurs inconnues, une moyenne cible est nécessaire.',
+              'One or more values are marked ?. With several unknowns, a target mean is required.');
+        });
+        return;
+      }
+      final knownSum = values.fold<double>(0, (a, b) => a + b);
+      final replacement = (target * parts.length - knownSum) / unknownCount;
+      resolvedUnknown = replacement;
+      values.addAll(List<double>.filled(unknownCount, replacement));
     }
     if (values.isEmpty) {
       setState(() {
@@ -118,9 +145,38 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     buf.writeln('${loc.t('Écart-type', 'Std. deviation')} σ = ${_fmt(std)}');
     buf.writeln(
         '${loc.t('Min', 'Min')} = ${_fmt(values.first)}  ${loc.t('Max', 'Max')} = ${_fmt(values.last)}');
+    final counts = <double, int>{};
+    for (final v in values) {
+      final key = counts.keys.firstWhere((k) => (k - v).abs() < MathLibrary.epsilon, orElse: () => v);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    final modalities = counts.keys.toList()..sort();
+    final modal = modalities.reduce((a, b) => counts[a]! >= counts[b]! ? a : b);
+    final classWidth = _parse(_classWidthCtrl.text) ?? 1;
+    var ecc = 0;
+    buf.writeln();
+    buf.writeln('— ${loc.t('Effectifs et fréquences cumulés', 'Cumulative counts and frequencies')} —');
+    buf.writeln('xᵢ | nᵢ | fᵢ | ECC | ECD | FCC | FCD');
+    for (final value in modalities) {
+      ecc += counts[value]!;
+      final ecd = counts.entries
+          .where((entry) => entry.key >= value - MathLibrary.epsilon)
+          .fold<int>(0, (total, entry) => total + entry.value);
+      buf.writeln('${_fmt(value)} | ${counts[value]} | ${_fmt(counts[value]! / n)} | '
+          '$ecc | $ecd | ${_fmt(ecc / n)} | ${_fmt(ecd / n)}');
+    }
+    buf.writeln('${loc.t('Classe modale', 'Modal class')} : '
+        '[${_fmt(modal - classWidth / 2)} ; ${_fmt(modal + classWidth / 2)}[');
+    if (unknownCount > 0) {
+      buf.writeln(loc.t(
+          'Les inconnues ont été prises égales : une moyenne seule ne permet pas de déterminer plusieurs valeurs de manière unique.',
+          'Unknowns were set equal: a mean alone cannot uniquely determine several values.'));
+    }
     setState(() {
-      _result =
-          '${loc.t('Moyenne', 'Mean')} : ${_fmt(mean)}\n${loc.t('Médiane', 'Median')} : ${_fmt(median)}\nσ = ${_fmt(std)}';
+      _result = '${loc.t('Moyenne', 'Mean')} : ${_fmt(mean)}\n'
+          '${loc.t('Médiane', 'Median')} : ${_fmt(median)}\n'
+          'σ = ${_fmt(std)}'
+          '${resolvedUnknown == null ? '' : '\n? = ${_fmt(resolvedUnknown)}'}';
       _steps = buf.toString();
     });
   }
@@ -331,6 +387,40 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _targetMeanCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: loc.t('Moyenne cible (pour ?)', 'Target mean (for ?)'),
+                      hintText: 'ex. 10',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _classWidthCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: loc.t('Amplitude de classe', 'Class width'),
+                      hintText: '1',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              loc.t('Utilisez ? pour une inconnue. Avec plusieurs inconnues, elles sont déterminées égales à partir de la moyenne cible.',
+                  'Use ? for an unknown. With several unknowns, they are set equal from the target mean.'),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ] else ...[
             Row(

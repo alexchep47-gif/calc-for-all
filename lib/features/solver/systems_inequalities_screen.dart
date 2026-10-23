@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-
+import '../../core/routes/app_routes.dart';
 import '../../data/services/math_library.dart';
 import '../../data/services/math_expression_engine.dart';
 
-/// Systèmes d'équations linéaires + inéquations avec représentation
 class SystemsInequalitiesScreen extends StatefulWidget {
   const SystemsInequalitiesScreen({super.key});
-
   @override
   State<SystemsInequalitiesScreen> createState() =>
       _SystemsInequalitiesScreenState();
@@ -15,13 +13,9 @@ class SystemsInequalitiesScreen extends StatefulWidget {
 class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
-
-  int _nEq = 2;
-  int _nVar = 2;
+  int _nEq = 2, _nVar = 2;
   late List<List<TextEditingController>> _coeff;
-  String _sysResult = '';
-  String _sysSteps = '';
-
+  String _sysResult = '', _sysSteps = '';
   final _ineqCtrl = TextEditingController(text: 'x^2 - 1');
   String _ineqOp = '>';
   String _ineqResult = '';
@@ -37,10 +31,7 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
   void _rebuildCoeff() {
     _coeff = List.generate(
       _nEq,
-      (_) => List.generate(
-        _nVar + 1,
-        (_) => TextEditingController(text: '0'),
-      ),
+      (_) => List.generate(_nVar + 1, (_) => TextEditingController(text: '0')),
     );
   }
 
@@ -71,138 +62,93 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
 
   String _fmt(double v) => MathLibrary.format(v);
 
+  String _boundLabel(double v) {
+    if (v <= -9.5) return '−∞';
+    if (v >= 9.5) return '+∞';
+    return _fmt(v);
+  }
+
+  void _openGraph() {
+    final expr = _ineqCtrl.text.trim();
+    Navigator.pushNamed(
+      context,
+      AppRoutes.graph,
+      arguments: expr.isEmpty ? null : expr,
+    );
+  }
+
   void _solveSystem() {
     final a = List.generate(
       _nEq,
       (i) => List.generate(_nVar + 1, (j) => _parse(_coeff[i][j].text)),
     );
-    final steps = StringBuffer();
-    steps.writeln('Système $_nEq équation(s), $_nVar inconnue(s)');
-    steps.writeln(
-        'Coefficients réels (fractions OK via MathLibrary).');
-    steps.writeln('Matrice augmentée :');
-    for (final row in a) {
-      steps.writeln(row.map(_fmt).join('  |  '));
-    }
-    steps.writeln();
-
-    final n = _nEq < _nVar ? _nEq : _nVar;
+    final steps = StringBuffer()..writeln('Système $_nEq × $_nVar');
     final m = a.map((r) => List<double>.from(r)).toList();
-
-    for (var col = 0; col < n; col++) {
-      var pivot = col;
-      for (var r = col + 1; r < m.length; r++) {
-        if (m[r][col].abs() > m[pivot][col].abs()) pivot = r;
+    final rows = _nEq, cols = _nVar;
+    var rank = 0;
+    for (var col = 0; col < cols && rank < rows; col++) {
+      var pivot = rank;
+      for (var i = rank + 1; i < rows; i++) {
+        if (m[i][col].abs() > m[pivot][col].abs()) pivot = i;
       }
       if (m[pivot][col].abs() < 1e-12) continue;
-      final tmp = m[col];
-      m[col] = m[pivot];
+      final tmp = m[rank];
+      m[rank] = m[pivot];
       m[pivot] = tmp;
-      final div = m[col][col];
-      for (var j = 0; j < m[col].length; j++) {
-        m[col][j] /= div;
+      final div = m[rank][col];
+      for (var j = 0; j <= cols; j++) {
+        m[rank][j] /= div;
       }
-      for (var r = 0; r < m.length; r++) {
-        if (r == col) continue;
-        final f = m[r][col];
-        for (var j = 0; j < m[r].length; j++) {
-          m[r][j] -= f * m[col][j];
+      for (var i = 0; i < rows; i++) {
+        if (i == rank) continue;
+        final f = m[i][col];
+        for (var j = 0; j <= cols; j++) {
+          m[i][j] -= f * m[rank][j];
         }
       }
+      rank++;
     }
-
-    steps.writeln('Après Gauss-Jordan :');
-    for (final row in m) {
-      steps.writeln(row.map(_fmt).join('  |  '));
-    }
-
-    // Détection système incompatible → ∅
-    var inconsistent = false;
-    for (final row in m) {
-      final allZero = row.take(_nVar).every((v) => v.abs() < 1e-10);
-      if (allZero && row.last.abs() > 1e-10) {
-        inconsistent = true;
-        break;
+    for (var i = 0; i < rows; i++) {
+      final allZero =
+          List.generate(cols, (j) => m[i][j]).every((v) => v.abs() < 1e-12);
+      if (allZero && m[i][cols].abs() > 1e-12) {
+        setState(() {
+          _sysResult = '∅';
+          _sysSteps = '${steps}Système incompatible → ∅';
+        });
+        return;
       }
     }
-
-    if (inconsistent) {
+    if (rank < cols) {
       setState(() {
-        _sysResult = '∅  (ensemble vide — système incompatible)';
+        _sysResult = 'Infinité de solutions (rang $rank < $cols)';
         _sysSteps = steps.toString();
       });
       return;
     }
-
-    final sols = <String>[];
-    for (var i = 0; i < n && i < m.length; i++) {
-      var pivotCol = -1;
-      for (var j = 0; j < _nVar; j++) {
-        if (m[i][j].abs() > 1e-9) {
-          pivotCol = j;
-          break;
-        }
-      }
-      if (pivotCol >= 0) {
-        final name = String.fromCharCode('x'.codeUnitAt(0) + pivotCol);
-        sols.add('$name = ${_fmt(m[i].last)}');
-      }
-    }
-
+    final text = List.generate(cols, (i) => 'x${i + 1} = ${_fmt(m[i][cols])}').join('\n');
     setState(() {
-      _sysResult = sols.isEmpty
-          ? '∅  (ensemble vide — aucune solution unique)'
-          : sols.join('  ;  ');
-      _sysSteps = steps.toString();
+      _sysResult = text;
+      _sysSteps = '${steps}Solution :\n$text';
     });
   }
 
   void _solveIneq() {
     final expr = _ineqCtrl.text.trim();
-    if (expr.isEmpty) return;
-    final steps = StringBuffer();
-    steps.writeln('Inéquation : f(x) $_ineqOp 0');
-    steps.writeln('avec f(x) = $expr');
-    steps.writeln();
-
+    final steps = StringBuffer()
+      ..writeln('f(x) $_ineqOp 0  avec f(x) = $expr');
     final roots = <double>[];
-    const n = 400;
-    const xMin = -10.0, xMax = 10.0;
-    final step = (xMax - xMin) / n;
-    double? prevX, prevY;
-    for (var i = 0; i <= n; i++) {
-      final x = xMin + i * step;
+    double? prevY;
+    for (var i = 0; i <= 400; i++) {
+      final x = -10 + i * 20 / 400;
       final y = _engine.evaluate(expr, x);
-      if (y == null || !y.isFinite) {
-        prevX = null;
+      if (y == null) {
         prevY = null;
         continue;
       }
-      if (y.abs() < 1e-6) {
-        if (roots.isEmpty || (x - roots.last).abs() > 0.1) roots.add(x);
-      } else if (prevY != null && prevX != null && prevY * y < 0) {
-        var a = prevX, b = x, fa = prevY;
-        for (var k = 0; k < 20; k++) {
-          final mid = (a + b) / 2;
-          final fm = _engine.evaluate(expr, mid);
-          if (fm == null) break;
-          if (fa * fm <= 0) {
-            b = mid;
-          } else {
-            a = mid;
-            fa = fm;
-          }
-        }
-        final r = (a + b) / 2;
-        if (roots.isEmpty || (r - roots.last).abs() > 0.1) roots.add(r);
-      }
-      prevX = x;
+      if (prevY != null && prevY * y <= 0) roots.add(x);
       prevY = y;
     }
-
-    steps.writeln(
-        'Racines de f (f=0) : ${roots.isEmpty ? 'aucune sur [-10;10]' : roots.map(_fmt).join(', ')}');
-
     final bounds = [-10.0, ...roots, 10.0];
     final intervals = <String>[];
     for (var i = 0; i < bounds.length - 1; i++) {
@@ -217,17 +163,10 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
         _ => false,
       };
       if (ok) {
-        intervals.add(']${_fmt(bounds[i])} ; ${_fmt(bounds[i + 1])}[');
+        intervals.add(
+            ']${_boundLabel(bounds[i])} ; ${_boundLabel(bounds[i + 1])}[');
       }
     }
-
-    steps.writeln('Solution (approx. sur [-10;10]) :');
-    if (intervals.isEmpty) {
-      steps.writeln('∅');
-    } else {
-      steps.writeln(intervals.join(' ∪ '));
-    }
-
     setState(() {
       _ineqResult = intervals.isEmpty ? '∅' : intervals.join(' ∪ ');
       _sysSteps = steps.toString();
@@ -239,20 +178,21 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Systèmes & Inéquations'),
+        actions: [
+          IconButton(
+            tooltip: 'Graphique',
+            icon: const Icon(Icons.show_chart),
+            onPressed: _openGraph,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabs,
-          tabs: const [
-            Tab(text: 'Systèmes'),
-            Tab(text: 'Inéquations'),
-          ],
+          tabs: const [Tab(text: 'Systèmes'), Tab(text: 'Inéquations')],
         ),
       ),
       body: TabBarView(
         controller: _tabs,
-        children: [
-          _buildSystemTab(),
-          _buildIneqTab(),
-        ],
+        children: [_buildSystemTab(), _buildIneqTab()],
       ),
     );
   }
@@ -261,75 +201,68 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Row(
-          children: [
-            const Text('Équations :'),
-            const SizedBox(width: 8),
-            DropdownButton<int>(
-              value: _nEq,
-              items: [1, 2, 3, 4, 5]
-                  .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
-                  .toList(),
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _nEq = v;
-                  _rebuildCoeff();
-                });
-              },
-            ),
-            const SizedBox(width: 16),
-            const Text('Inconnues :'),
-            const SizedBox(width: 8),
-            DropdownButton<int>(
-              value: _nVar,
-              items: [1, 2, 3, 4, 5]
-                  .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
-                  .toList(),
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _nVar = v;
-                  _rebuildCoeff();
-                });
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Coefficients (fractions : 1/2, -3/4). Dernière colonne = constante.',
-          style: TextStyle(fontSize: 12),
-        ),
-        const SizedBox(height: 8),
+        Row(children: [
+          const Text('Éq. '),
+          DropdownButton<int>(
+            value: _nEq,
+            items: [1, 2, 3, 4, 5]
+                .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
+                .toList(),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _nEq = v;
+                _rebuildCoeff();
+              });
+            },
+          ),
+          const SizedBox(width: 12),
+          const Text('Inc. '),
+          DropdownButton<int>(
+            value: _nVar,
+            items: [1, 2, 3, 4, 5]
+                .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
+                .toList(),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _nVar = v;
+                _rebuildCoeff();
+              });
+            },
+          ),
+        ]),
         ...List.generate(_nEq, (i) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Text('E${i + 1}:',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 6),
-                ...List.generate(_nVar + 1, (j) {
-                  final label = j < _nVar
-                      ? String.fromCharCode('x'.codeUnitAt(0) + j)
-                      : '=';
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: TextField(
-                        controller: _coeff[i][j],
-                        decoration: InputDecoration(
-                          labelText: label,
-                          isDense: true,
-                          border: const OutlineInputBorder(),
-                        ),
+            child: Row(children: [
+              ...List.generate(_nVar, (j) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: TextField(
+                      controller: _coeff[i][j],
+                      decoration: InputDecoration(
+                        isDense: true,
+                        labelText: 'a${i + 1}${j + 1}',
+                        border: const OutlineInputBorder(),
                       ),
                     ),
-                  );
-                }),
-              ],
-            ),
+                  ),
+                );
+              }),
+              const Text('='),
+              Expanded(
+                child: TextField(
+                  controller: _coeff[i][_nVar],
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'b',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+            ]),
           );
         }),
         FilledButton.icon(
@@ -339,17 +272,9 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
         ),
         if (_sysResult.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(_sysResult,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(_sysSteps,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+          Text(_sysResult,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          SelectableText(_sysSteps),
         ],
       ],
     );
@@ -362,47 +287,37 @@ class _SystemsInequalitiesScreenState extends State<SystemsInequalitiesScreen>
         TextField(
           controller: _ineqCtrl,
           decoration: const InputDecoration(
-            labelText: 'f(x)  (ex: x^2-1 , 2x+3)',
+            labelText: 'f(x) =',
             border: OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
-          children: ['>', '≥', '<', '≤'].map((op) {
-            return ChoiceChip(
-              label: Text('f(x) $op 0'),
-              selected: _ineqOp == op,
-              onSelected: (_) => setState(() => _ineqOp = op),
-            );
-          }).toList(),
+          children: ['>', '≥', '<', '≤']
+              .map((op) => ChoiceChip(
+                    label: Text('f $op 0'),
+                    selected: _ineqOp == op,
+                    onSelected: (_) => setState(() => _ineqOp = op),
+                  ))
+              .toList(),
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: _solveIneq,
+          icon: const Icon(Icons.functions),
+          label: const Text('Résoudre'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _openGraph,
           icon: const Icon(Icons.show_chart),
-          label: const Text('Résoudre + représentation'),
+          label: const Text('Ouvrir dans Graphique'),
         ),
         if (_ineqResult.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Card(
-            color: Colors.blue.shade50,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Ensemble solution :',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text(_ineqResult,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(_sysSteps, style: const TextStyle(fontSize: 13, height: 1.4)),
+          Text('S = $_ineqResult',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          SelectableText(_sysSteps),
         ],
       ],
     );

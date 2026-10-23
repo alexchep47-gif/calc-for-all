@@ -1,10 +1,14 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/l10n/locale_provider.dart';
+import '../../core/routes/app_routes.dart';
 import '../../data/services/ocr_service.dart';
 
+/// Lecture d’expressions : OCR imprimé + conseils HTR manuscrit (on-device).
 class OcrScreen extends StatefulWidget {
   const OcrScreen({super.key});
 
@@ -17,6 +21,7 @@ class _OcrScreenState extends State<OcrScreen> {
   bool _isBusy = false;
   String _text = '';
   String _error = '';
+  String _langHint = 'fr'; // fr | en
 
   Future<void> _scanFrom(ImageSource source) async {
     setState(() {
@@ -31,14 +36,29 @@ class _OcrScreenState extends State<OcrScreen> {
         _isBusy = false;
         _text = text ?? '';
         if (_text.isEmpty) {
-          _error = 'OCR : aucune expression lisible n’a été trouvée. Les manuscrits sont difficiles à lire.';
+          _error = kIsWeb
+              ? (_langHint == 'fr'
+                  ? 'Aucun texte détecté. Sur le web, le manuscrit est peu fiable. '
+                      'Utilisez une photo nette d’écriture imprimée, ou l’app mobile (modèle hors ligne).'
+                  : 'No text detected. Handwriting is unreliable on web. '
+                      'Use a sharp photo of printed text, or the mobile app (on-device model).')
+              : (_langHint == 'fr'
+                  ? 'Aucun texte lisible. Pour le manuscrit : contraste élevé, une ligne, '
+                      'écriture large, bonne lumière. Le modèle hors ligne (latin) est optimisé '
+                      'pour l’imprimé ; le manuscrit reste approximatif.'
+                  : 'No readable text. For handwriting: high contrast, single line, '
+                      'large writing, good light. The offline model works best on print.');
         }
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _isBusy = false;
-        _error = 'OCR indisponible : vérifiez l’image sélectionnée. Le texte manuscrit reste peu fiable.';
+        _error = _langHint == 'fr'
+            ? 'Échec de la lecture. Vérifiez l’image (format, netteté). '
+                'Le texte manuscrit nécessite souvent plusieurs essais.'
+            : 'Read failed. Check the image (format, sharpness). '
+                'Handwriting often needs several tries.';
       });
     }
   }
@@ -47,18 +67,40 @@ class _OcrScreenState extends State<OcrScreen> {
   Widget build(BuildContext context) {
     final locale = context.watch<LocaleProvider>();
     final isFr = locale.isFrench;
+    _langHint = isFr ? 'fr' : 'en';
+
     return Scaffold(
-      appBar: AppBar(title: Text(isFr ? 'Lecture OCR' : 'OCR Reader')),
+      appBar: AppBar(
+        title: Text(isFr ? 'Lecture OCR' : 'OCR Reader'),
+      ),
       body: SafeArea(
-        child: Padding(
+        child: ListView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(children: [
+          children: [
+            Card(
+              color: Colors.blue.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  isFr
+                      ? 'Hors ligne (mobile) : modèle on-device latin.\n'
+                          'Manuscrit : photo nette, contraste fort, une expression par image.\n'
+                          'Langue du document : alignée sur la langue de l’app (FR/EN) '
+                          'pour le dictionnaire de correction.'
+                      : 'Offline (mobile): on-device Latin model.\n'
+                          'Handwriting: sharp photo, strong contrast, one expression per image.\n'
+                          'Document language follows app language (FR/EN) for corrections.',
+                  style: const TextStyle(height: 1.4, fontSize: 13),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _isBusy ? null : () => _scanFrom(ImageSource.gallery),
+                    onPressed:
+                        _isBusy ? null : () => _scanFrom(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined),
                     label: Text(isFr ? 'Galerie' : 'Gallery'),
                   ),
@@ -66,49 +108,72 @@ class _OcrScreenState extends State<OcrScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _isBusy ? null : () => _scanFrom(ImageSource.camera),
+                    onPressed:
+                        _isBusy ? null : () => _scanFrom(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt_outlined),
                     label: Text(isFr ? 'Caméra' : 'Camera'),
                   ),
                 ),
-              ]),
-              const SizedBox(height: 16),
-              if (_isBusy)
-                const Expanded(child: Center(child: CircularProgressIndicator()))
-              else if (_error.isNotEmpty)
-                Card(
-                  color: Colors.red.shade50,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(_error, style: TextStyle(color: Colors.red.shade800)),
-                  ),
-                )
-              else if (_text.isNotEmpty)
-                Expanded(
-                  child: Card(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: SelectableText(_text, style: const TextStyle(fontSize: 16, height: 1.5)),
-                    ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      isFr
-                          ? 'Sélectionnez une image pour reconnaître une expression. Le meilleur résultat vaut pour du texte imprimé ; le manuscrit reste limité.'
-                          : 'Select an image to recognize an expression. Best results are for printed text; handwriting remains limited.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                    ),
-                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_isBusy)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error.isNotEmpty)
+              Card(
+                color: Colors.orange.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Text(_error, style: const TextStyle(height: 1.4)),
                 ),
-            ],
-          ),
+              )
+            else if (_text.isNotEmpty) ...[
+              Text(
+                isFr ? 'Texte reconnu' : 'Recognized text',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              SelectableText(
+                _text,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _text));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text(isFr ? 'Copié' : 'Copied')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: Text(isFr ? 'Copier' : 'Copy'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pushNamed(context, AppRoutes.calculator);
+                    },
+                    icon: const Icon(Icons.calculate),
+                    label: Text(isFr ? 'Ouvrir calculatrice' : 'Open calculator'),
+                  ),
+                ],
+              ),
+            ] else
+              Text(
+                isFr
+                    ? 'Choisissez une image d’équation ou de formule.'
+                    : 'Pick an image of an equation or formula.',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+          ],
         ),
       ),
     );
   }
 }
-

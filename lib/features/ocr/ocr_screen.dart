@@ -31,14 +31,14 @@ class _OcrScreenState extends State<OcrScreen> {
         _isBusy = false;
         _text = text ?? '';
         if (_text.isEmpty) {
-          _error = 'OCR : aucune expression lisible n’a été trouvée.';
+          _error = 'OCR : aucune expression lisible n’a été trouvée. Les manuscrits sont difficiles à lire.';
         }
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _isBusy = false;
-        _error = 'OCR indisponible : vérifiez Tesseract.js et l’image sélectionnée.';
+        _error = 'OCR indisponible : vérifiez l’image sélectionnée. Le texte manuscrit reste peu fiable.';
       });
     }
   }
@@ -96,7 +96,9 @@ class _OcrScreenState extends State<OcrScreen> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      isFr ? 'Sélectionnez une image pour reconnaître une expression.' : 'Select an image to recognize an expression.',
+                      isFr
+                          ? 'Sélectionnez une image pour reconnaître une expression. Le meilleur résultat vaut pour du texte imprimé ; le manuscrit reste limité.'
+                          : 'Select an image to recognize an expression. Best results are for printed text; handwriting remains limited.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
@@ -109,3 +111,4 @@ class _OcrScreenState extends State<OcrScreen> {
     );
   }
 }
+

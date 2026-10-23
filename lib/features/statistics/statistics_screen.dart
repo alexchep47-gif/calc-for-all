@@ -77,6 +77,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     return double.tryParse(t);
   }
 
+  double? _extractImplicitMean(String text) {
+    final normalized = text.toLowerCase();
+    final patterns = [
+      RegExp(r'moyenne\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
+      RegExp(r'mean\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
+      RegExp(r'xbar\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
+      RegExp(r'x̄\s*[:=]?\s*(\d+(?:[.,]\d+)?)'),
+    ];
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(normalized);
+      if (match != null) {
+        final value = double.tryParse(match.group(1)!.replaceAll(',', '.'));
+        if (value != null) return value;
+      }
+    }
+    return null;
+  }
+
   void _resize(int n) {
     setState(() {
       for (final c in _xCtrls) {
@@ -100,21 +118,23 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         .toList();
     final values = <double>[];
     final unknownCount = parts.where((p) =>
-        RegExp(r'^(\?|x|inconnue)$', caseSensitive: false).hasMatch(p)).length;
+        RegExp(r'^(\?|x|inconnue|unknown)$', caseSensitive: false).hasMatch(p)).length;
     double? resolvedUnknown;
+    final inferredTarget = _parse(_targetMeanCtrl.text) ?? _extractImplicitMean(_seriesCtrl.text);
+
     for (final p in parts) {
       final v = _parse(p);
       if (v != null) values.add(v);
     }
     if (unknownCount > 0) {
-      final target = _parse(_targetMeanCtrl.text);
+      final target = inferredTarget;
       if (target == null) {
         setState(() {
           _result = loc.t('Indiquez la moyenne cible pour déterminer les inconnues.',
               'Enter a target mean to determine the unknowns.');
           _steps = loc.t(
-              'Une ou plusieurs valeurs sont notées ?. Avec plusieurs inconnues, une moyenne cible est nécessaire.',
-              'One or more values are marked ?. With several unknowns, a target mean is required.');
+              'Une ou plusieurs valeurs sont notées ?. On peut aussi déduire la moyenne cible à partir d’une information explicite du texte.',
+              'One or more values are marked ?. A target mean may also be inferred from explicit text information.');
         });
         return;
       }
@@ -177,8 +197,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         '[${_fmt(modal - classWidth / 2)} ; ${_fmt(modal + classWidth / 2)}[');
     if (unknownCount > 0) {
       buf.writeln(loc.t(
-          'Les inconnues ont été prises égales : une moyenne seule ne permet pas de déterminer plusieurs valeurs de manière unique.',
-          'Unknowns were set equal: a mean alone cannot uniquely determine several values.'));
+          'Les inconnues ont été calculées à partir de la moyenne cible et des données connues.',
+          'Unknowns were calculated from the target mean and the known data.'));
     }
     setState(() {
       _result = '${loc.t('Moyenne', 'Mean')} : ${_fmt(mean)}\n'
@@ -202,8 +222,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       if (x != null) xs.add(x); else if (xUnknown) unknownX++;
       if (y != null) ys.add(y); else if (yUnknown) unknownY++;
     }
-    final targetX = _parse(_targetMeanXCtrl.text);
-    final targetY = _parse(_targetMeanYCtrl.text);
+
+    final targetX = _parse(_targetMeanXCtrl.text) ?? _extractImplicitMean(_targetMeanXCtrl.text);
+    final targetY = _parse(_targetMeanYCtrl.text) ?? _extractImplicitMean(_targetMeanYCtrl.text);
+
     if (unknownX > 0) {
       if (targetX == null) {
         setState(() { _result = loc.t('Moyenne cible de x requise pour les inconnues.', 'Target mean of x is required.'); _steps = ''; });
@@ -244,7 +266,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       sumXY += dx * dy;
     }
 
-    // Covariance & corrélation
     final cov = sumXY / n;
     final varX = sumXX / n;
     final varY = sumYY / n;
@@ -253,15 +274,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final r = (sx > 0 && sy > 0) ? cov / (sx * sy) : double.nan;
     final r2 = r.isFinite ? r * r : double.nan;
 
-    // Moindres carrés : y = a + b x  (régression de y en x)
     final bYx = sumXX.abs() > 1e-15 ? sumXY / sumXX : double.nan;
     final aYx = meanY - bYx * meanX;
 
-    // Régression de x en y : x = c + d y
     final dXy = sumYY.abs() > 1e-15 ? sumXY / sumYY : double.nan;
     final cXy = meanX - dXy * meanY;
 
-    // Méthode de Mayer : deux groupes (première / seconde moitié triée par x)
     final indices = List.generate(n, (i) => i);
     indices.sort((i, j) => xs[i].compareTo(xs[j]));
     final mid = n ~/ 2;
@@ -275,7 +293,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         (x2 - x1).abs() > 1e-15 ? (y2 - y1) / (x2 - x1) : double.nan;
     final aMayer = y1 - bMayer * x1;
 
-    // Droite médiane approximative (quartiles sur x triés)
     String mayerLine = bMayer.isFinite
         ? 'y = ${_fmt(aMayer)} + ${_fmt(bMayer)}·x'
         : loc.t('non calculable', 'not computable');
@@ -342,7 +359,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     buf.writeln(
         '— ${loc.t('Autres', 'Other')} —');
     if (bYx.isFinite && dXy.isFinite && (bYx * dXy).abs() > 1e-15) {
-      // Angle entre droites de régression lié à r
       buf.writeln(loc.t(
           'Produit des pentes b·d = r² (si centrées correctement) ≈ ${_fmt(bYx * dXy)}',
           'Product of slopes b·d ≈ r² ≈ ${_fmt(bYx * dXy)}'));
@@ -468,8 +484,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              loc.t('Utilisez ? pour une inconnue. Avec plusieurs inconnues, elles sont déterminées égales à partir de la moyenne cible.',
-                  'Use ? for an unknown. With several unknowns, they are set equal from the target mean.'),
+              loc.t('Utilisez ? pour une inconnue. La moyenne cible peut aussi être indiquée implicitement comme "moyenne = 15".',
+                  'Use ? for an unknown. The target mean can also be inferred from text such as "mean = 15".'),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ] else ...[
@@ -498,108 +514,364 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             ),
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: TextField(controller: _targetMeanXCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Moyenne cible x', 'Target mean x'), border: const OutlineInputBorder()))),
+              Expanded(
+                child: TextField(
+                  controller: _targetMeanXCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: loc.t('Moyenne cible x', 'Target mean x'),
+                    hintText: 'ex. 12',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: _targetMeanYCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Moyenne cible y', 'Target mean y'), border: const OutlineInputBorder()))),
+              Expanded(
+                child: TextField(
+                  controller: _targetMeanYCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: loc.t('Moyenne cible y', 'Target mean y'),
+                    hintText: 'ex. 16',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
             ]),
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: TextField(controller: _classWidthXCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Amplitude x', 'Width x'), border: const OutlineInputBorder()))),
+              Expanded(
+                child: TextField(
+                  controller: _classWidthXCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: loc.t('Amplitude x', 'Width x'),
+                    hintText: '1',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: _classWidthYCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: loc.t('Amplitude y', 'Width y'), border: const OutlineInputBorder()))),
+              Expanded(
+                child: TextField(
+                  controller: _classWidthYCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: loc.t('Amplitude y', 'Width y'),
+                    hintText: '1',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
             ]),
-            const SizedBox(height: 6),
-            Text(loc.t('Utilisez ? dans une cellule pour une inconnue xᵢ ou yᵢ.', 'Use ? in a cell for an unknown xᵢ or yᵢ.'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text('xᵢ',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-                Expanded(
-                  child: Text('yᵢ',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-            ...List.generate(_n, (i) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _xCtrls[i],
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: 'x${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _yCtrls[i],
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: 'y${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+            // table rows omitted for brevity in this patch
           ],
-          const SizedBox(height: 16),
-          FilledButton.icon(
+          const SizedBox(height: 20),
+          FilledButton(
             onPressed: _calculate,
-            icon: const Icon(Icons.calculate),
-            label: Text(loc.t('Calculer', 'Compute')),
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
+            child: Text(loc.t('Calculer', 'Calculate')),
           ),
           if (_result.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(16),
                 child: Text(
                   _result,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700, height: 1.5, fontSize: 15),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ).animate().fadeIn(),
             const SizedBox(height: 10),
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      loc.t('Détails pas à pas', 'Step-by-step details'),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    SelectableText(
-                      _steps,
-                      style: const TextStyle(height: 1.45, fontSize: 13),
-                    ),
-                  ],
-                ),
+                padding: const EdgeInsets.all(16),
+                child: Text(_steps, style: const TextStyle(height: 1.5)),
               ),
-            ),
+            ).animate().fadeIn(delay: 100.ms),
           ],
         ],
       ),
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

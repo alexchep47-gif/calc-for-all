@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/l10n/locale_provider.dart';
 
-/// Formules mathématiques hors ligne (pas de mention technique interne)
 class MathLibraryScreen extends StatefulWidget {
   const MathLibraryScreen({super.key});
 
@@ -27,36 +26,72 @@ class _MathLibraryScreenState extends State<MathLibraryScreen> {
         loc.t('Complexes', 'Complex'),
         loc.t('Matrices', 'Matrices'),
         loc.t('Statistiques', 'Statistics'),
+        loc.t('Nombres', 'Numbers'),
       ];
 
   List<_Formula> _formulas(LocaleProvider loc) => [
+        // Algèbre
         _Formula('Algèbre', 'Algebra', loc.t('Identités remarquables', 'Remarkable identities'),
-            '(a+b)² = a² + 2ab + b²\n(a−b)² = a² − 2ab + b²\na² − b² = (a−b)(a+b)'),
+            '(a+b)² = a² + 2ab + b²\n(a−b)² = a² − 2ab + b²\na² − b² = (a−b)(a+b)\n(a+b)³ = a³ + 3a²b + 3ab² + b³\n(a−b)³ = a³ − 3a²b + 3ab² − b³\na³ ± b³ = (a ± b)(a² ∓ ab + b²)'),
         _Formula('Algèbre', 'Algebra', loc.t('Équation du second degré', 'Quadratic equation'),
-            'ax² + bx + c = 0\nΔ = b² − 4ac'),
+            'ax² + bx + c = 0\nΔ = b² − 4ac\nΔ > 0 : deux racines réelles\nΔ = 0 : racine double\nΔ < 0 : racines complexes\nx = (−b ± √Δ) / (2a)'),
+        _Formula('Algèbre', 'Algebra', loc.t('Factorisation', 'Factoring'),
+            'x² + sx + p = (x−r₁)(x−r₂)\nSomme des racines = −b/a\nProduit = c/a'),
+        _Formula('Algèbre', 'Algebra', loc.t('Valeur absolue', 'Absolute value'),
+            '|x| = x si x ≥ 0, −x si x < 0\n|a·b| = |a|·|b|\n|a+b| ≤ |a|+|b|'),
+        // Analyse
         _Formula('Analyse', 'Analysis', loc.t('Dérivées usuelles', 'Common derivatives'),
-            '(xⁿ)′ = n xⁿ⁻¹\n(sin x)′ = cos x\n(eˣ)′ = eˣ\n(ln x)′ = 1/x'),
+            '(xⁿ)′ = n xⁿ⁻¹\n(sin x)′ = cos x\n(cos x)′ = −sin x\n(tan x)′ = 1/cos²x\n(eˣ)′ = eˣ\n(ln x)′ = 1/x\n(√x)′ = 1/(2√x)\n(u∘v)′ = (u′∘v)·v′  (chaîne)'),
         _Formula('Analyse', 'Analysis', loc.t('Primitives usuelles', 'Common antiderivatives'),
-            '∫ xⁿ dx = xⁿ⁺¹/(n+1) + C\n∫ 1/x dx = ln|x| + C'),
+            '∫ xⁿ dx = xⁿ⁺¹/(n+1) + C (n≠−1)\n∫ 1/x dx = ln|x| + C\n∫ sin x dx = −cos x + C\n∫ cos x dx = sin x + C\n∫ eˣ dx = eˣ + C'),
+        _Formula('Analyse', 'Analysis', loc.t('Intégration par parties', 'Integration by parts'),
+            '∫ u dv = uv − ∫ v du'),
+        _Formula('Analyse', 'Analysis', loc.t('Changement de variable', 'Substitution'),
+            'u = g(x), du = g′(x) dx'),
+        _Formula('Analyse', 'Analysis', loc.t('Limites usuelles', 'Common limits'),
+            'lim_{x→0} sin x / x = 1\nlim_{x→0} (1−cos x)/x² = 1/2\nlim_{x→∞} (1+1/x)ˣ = e'),
+        // Trigo
         _Formula('Trigonométrie', 'Trigonometry', loc.t('Identités', 'Identities'),
-            'cos²θ + sin²θ = 1\nsin(2θ) = 2 sinθ cosθ'),
-        _Formula('Trigonométrie', 'Trigonometry', loc.t('Angles moitiés', 'Half-angle formulas'),
-            'sin²(θ/2) = (1 − cosθ)/2\ncos²(θ/2) = (1 + cosθ)/2\ntan²(θ/2) = (1 − cosθ)/(1 + cosθ)\nsin(θ/2) = ±√((1 − cosθ)/2)\ncos(θ/2) = ±√((1 + cosθ)/2)\ntan(θ/2) = sinθ/(1 + cosθ) = (1 − cosθ)/sinθ'),
-        _Formula('Complexes', 'Complex', loc.t('Angles moitiés complexes', 'Complex half-angle factorization'),
-            'e^{iθ} = cosθ + i sinθ\ncos(θ/2) = ±√((1 + cosθ)/2)\nsin(θ/2) = ±√((1 − cosθ)/2)\ne^{iθ/2} = ±(√((1 + cosθ)/2) + i√((1 − cosθ)/2))\ncosθ = (e^{iθ}+e^{-iθ})/2\nsinθ = (e^{iθ}−e^{-iθ})/(2i)'),
+            'cos²θ + sin²θ = 1\n1 + tan²θ = 1/cos²θ\nsin(2θ) = 2 sinθ cosθ\ncos(2θ) = cos²θ − sin²θ\nsin(a±b) = sin a cos b ± cos a sin b\ncos(a±b) = cos a cos b ∓ sin a sin b'),
+        _Formula('Trigonométrie', 'Trigonometry', loc.t('Valeurs remarquables', 'Key values'),
+            'sin 0 = 0, cos 0 = 1\nsin(π/6)=1/2, cos(π/6)=√3/2\nsin(π/4)=√2/2, cos(π/4)=√2/2\nsin(π/3)=√3/2, cos(π/3)=1/2\nsin(π/2)=1, cos(π/2)=0'),
+        // Géométrie
+        _Formula('Géométrie', 'Geometry', 'Pythagore / Pythagoras', 'a² + b² = c²'),
+        _Formula('Géométrie', 'Geometry', loc.t('Aires', 'Areas'),
+            'Triangle : (b·h)/2\nRectangle : L·l\nCercle : π r²\nDisque secteur : (α/2π)·π r²'),
+        _Formula('Géométrie', 'Geometry', loc.t('Volumes', 'Volumes'),
+            'Cube : a³\nPavé : L·l·h\nSphère : (4/3)π r³\nCylindre : π r² h\nCône : (1/3)π r² h'),
+        // Proba
+        _Formula('Probabilités', 'Probability', loc.t('Combinatoire', 'Combinatorics'),
+            'P(n,k) = n!/(n−k)!\nC(n,k) = n!/(k!(n−k)!)\nn! = 1·2·…·n'),
+        _Formula('Probabilités', 'Probability', loc.t('Lois', 'Distributions'),
+            'Bernoulli, binomiale B(n,p)\nP(X=k) = C(n,k) pᵏ (1−p)ⁿ⁻ᵏ\nEspérance binomiale : np'),
+        // Suites
+        _Formula('Suites', 'Sequences', loc.t('Arithmétique', 'Arithmetic'),
+            'uₙ = u₁ + (n−1)r\nSₙ = n(u₁+uₙ)/2'),
+        _Formula('Suites', 'Sequences', loc.t('Géométrique', 'Geometric'),
+            'uₙ = u₁ · qⁿ⁻¹\nSₙ = u₁ (qⁿ−1)/(q−1) (q≠1)'),
+        // Complexes
+        _Formula('Complexes', 'Complex', loc.t('Formes', 'Forms'),
+            'z = a+bi = |z|(cosθ + i sinθ) = |z| e^{iθ}\n|z| = √(a²+b²)\narg(z) en fractions de π'),
+        _Formula('Complexes', 'Complex', loc.t('Opérations', 'Operations'),
+            '(a+bi)+(c+di) = (a+c)+(b+d)i\n(a+bi)(c+di) = …\n1/z = z̄ / |z|²'),
+        // Matrices
+        _Formula('Matrices', 'Matrices', 'det 2×2', '|a b; c d| = ad − bc'),
+        _Formula('Matrices', 'Matrices', loc.t('Opérations', 'Operations'),
+            'Trace = somme diagonale\nᵗA transposition\nA⁻¹ si det≠0'),
+        // Stats
         _Formula('Statistiques', 'Statistics', loc.t('Régression linéaire', 'Linear regression'),
             'y = a + bx\nb = cov(x,y)/var(x)\nr = cov/(σₓ σᵧ)'),
         _Formula('Statistiques', 'Statistics', loc.t('Méthode de Mayer', 'Mayer method'),
             'Deux groupes de moyennes (x̄₁,ȳ₁), (x̄₂,ȳ₂)\nb = (ȳ₂−ȳ₁)/(x̄₂−x̄₁)'),
-        _Formula('Complexes', 'Complex', loc.t('Formes', 'Forms'),
-            'z = a+bi = |z|(cosθ + i sinθ)'),
-        _Formula('Matrices', 'Matrices', 'det 2×2', '|a b; c d| = ad − bc'),
-        _Formula('Suites', 'Sequences', loc.t('Arithmétique', 'Arithmetic'),
-            'uₙ = u₁ + (n−1)r\nSₙ = n(u₁+uₙ)/2'),
-        _Formula('Probabilités', 'Probability', loc.t('Combinaisons', 'Combinations'),
-            'C(n,k) = n! / (k!(n−k)!)'),
-        _Formula('Géométrie', 'Geometry', 'Pythagore / Pythagoras',
-            'a² + b² = c²'),
+        _Formula('Statistiques', 'Statistics', loc.t('Séries groupées', 'Grouped series'),
+            'Classe [aᵢ ; bᵢ[\ncᵢ = (aᵢ+bᵢ)/2\nx̄ = Σ nᵢcᵢ / N\nMédiane, mode, ECC, FEC…'),
+        // Nombres
+        _Formula('Nombres', 'Numbers', loc.t('Bases', 'Bases'),
+            'Décimal ↔ binaire ↔ hexadécimal\nEx. 13 = 1101₂ = D₁₆'),
+        _Formula('Nombres', 'Numbers', loc.t('Fractions', 'Fractions'),
+            'Simplifier : 2/2 = 1\na/b + c/d = (ad+bc)/(bd)'),
       ];
 
   @override
@@ -78,9 +113,7 @@ class _MathLibraryScreenState extends State<MathLibraryScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(loc.t('Formules', 'Formulas')),
-      ),
+      appBar: AppBar(title: Text(loc.t('Formules', 'Formulas'))),
       body: Column(
         children: [
           Padding(

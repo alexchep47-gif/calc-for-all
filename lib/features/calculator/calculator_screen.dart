@@ -327,6 +327,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             onPressed: () => Navigator.pushNamed(context, AppRoutes.graph),
           ),
           IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'Historique',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
+          ),
+          IconButton(
             icon: const Icon(Icons.document_scanner_rounded),
             tooltip: 'Lire une expression avec l’OCR',
             onPressed: _scanExpression,

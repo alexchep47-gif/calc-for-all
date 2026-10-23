@@ -6,8 +6,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/l10n/locale_provider.dart';
 import '../../data/services/math_library.dart';
+import '../../data/services/regression_service.dart';
 
-/// Statistiques : 1D, x/y, séries groupées (classes [aᵢ ; bᵢ[)
+/// Statistiques : 1D, x/y (régressions détaillées), séries groupées
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
 
@@ -16,7 +17,7 @@ class StatisticsScreen extends StatefulWidget {
 }
 
 class _StatisticsScreenState extends State<StatisticsScreen> {
-  String _mode = 'grouped';
+  String _mode = '2d';
   int _n = 5;
   int _nClasses = 4;
 
@@ -156,36 +157,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       });
       return;
     }
-    final n = xs.length;
-    final meanX = xs.reduce((a, b) => a + b) / n;
-    final meanY = ys.reduce((a, b) => a + b) / n;
-    var sumXX = 0.0, sumYY = 0.0, sumXY = 0.0;
-    for (var i = 0; i < n; i++) {
-      final dx = xs[i] - meanX;
-      final dy = ys[i] - meanY;
-      sumXX += dx * dx;
-      sumYY += dy * dy;
-      sumXY += dx * dy;
-    }
-    final cov = sumXY / n;
-    final sx = math.sqrt(sumXX / n);
-    final sy = math.sqrt(sumYY / n);
-    final r = (sx > 0 && sy > 0) ? cov / (sx * sy) : double.nan;
-    final bYx = sumXX.abs() > 1e-15 ? sumXY / sumXX : double.nan;
-    final aYx = meanY - bYx * meanX;
-    final dXy = sumYY.abs() > 1e-15 ? sumXY / sumYY : double.nan;
-    final cXy = meanX - dXy * meanY;
-
+    final out = RegressionService.analyze(xs, ys, french: loc.isFrench);
     setState(() {
-      _result =
-          '${loc.t('Point moyen', 'Mean point')} G(${_fmt(meanX)} ; ${_fmt(meanY)})\n'
-          'r = ${_fmt(r)}\n'
-          'y = ${_fmt(aYx)} + ${_fmt(bYx)}·x\n'
-          'x = ${_fmt(cXy)} + ${_fmt(dXy)}·y';
-      _steps =
-          'n = $n\ncov = ${_fmt(cov)}\nr² = ${_fmt(r * r)}\n'
-          '${loc.t('Régression y en x', 'y on x')} : a=${_fmt(aYx)}, b=${_fmt(bYx)}\n'
-          '${loc.t('Régression x en y', 'x on y')} : c=${_fmt(cXy)}, d=${_fmt(dXy)}';
+      _result = out.summary;
+      _steps = out.steps;
     });
   }
 
@@ -206,13 +181,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     if (a.length < 2) {
       setState(() {
         _result = loc.t(
-            'Au moins 2 classes valides [a ; b[ avec nᵢ ≥ 0',
-            'At least 2 valid classes [a ; b[ with nᵢ ≥ 0');
+            'Au moins 2 classes valides [a ; b[',
+            'At least 2 valid classes [a ; b[');
         _steps = '';
       });
       return;
     }
-
     final k = a.length;
     final c = List<double>.generate(k, (i) => (a[i] + b[i]) / 2);
     final w = List<double>.generate(k, (i) => b[i] - a[i]);
@@ -224,13 +198,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       });
       return;
     }
-
     final nici = List<double>.generate(k, (i) => ni[i] * c[i]);
     final nici2 = List<double>.generate(k, (i) => ni[i] * c[i] * c[i]);
     final fi = List<double>.generate(k, (i) => ni[i] / N);
-    final dens = List<double>.generate(
-        k, (i) => w[i] > 0 ? ni[i] / w[i] : double.nan);
-
+    final dens = List<double>.generate(k, (i) => w[i] > 0 ? ni[i] / w[i] : double.nan);
     final ecc = List<double>.filled(k, 0);
     final ecd = List<double>.filled(k, 0);
     ecc[0] = ni[0];
@@ -243,13 +214,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
     final fec = ecc.map((e) => e / N).toList();
     final fcd = ecd.map((e) => e / N).toList();
-
-    final sumNiCi = nici.reduce((x, y) => x + y);
-    final mean = sumNiCi / N;
-    final sumNiCi2 = nici2.reduce((x, y) => x + y);
-    final variance = sumNiCi2 / N - mean * mean;
+    final mean = nici.reduce((x, y) => x + y) / N;
+    final variance = nici2.reduce((x, y) => x + y) / N - mean * mean;
     final std = math.sqrt(variance.abs());
-
     final half = N / 2;
     var medIdx = 0;
     for (var i = 0; i < k; i++) {
@@ -259,9 +226,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       }
     }
     final fPrev = medIdx == 0 ? 0.0 : ecc[medIdx - 1];
-    final median =
-        a[medIdx] + ((half - fPrev) / ni[medIdx]) * w[medIdx];
-
+    final median = a[medIdx] + ((half - fPrev) / ni[medIdx]) * w[medIdx];
     var modIdx = 0;
     for (var i = 1; i < k; i++) {
       final di = dens[i].isFinite ? dens[i] : ni[i];
@@ -275,44 +240,18 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final mode = denom.abs() > 1e-12
         ? a[modIdx] + ((fm - f1) / denom) * w[modIdx]
         : c[modIdx];
-
     final buf = StringBuffer();
-    buf.writeln(loc.t('Séries groupées — classes [aᵢ ; bᵢ[',
-        'Grouped series — classes [aᵢ ; bᵢ['));
     buf.writeln('N = ${_fmt(N)}');
-    buf.writeln();
-    buf.writeln(
-        'i | [a;b[ | cᵢ | nᵢ | nᵢcᵢ | nᵢcᵢ² | wᵢ | fᵢ | dens | ECC | ECD | FEC | FCD');
     for (var i = 0; i < k; i++) {
       buf.writeln(
-          '${i + 1} | [${_fmt(a[i])} ; ${_fmt(b[i])}[ | ${_fmt(c[i])} | ${_fmt(ni[i])} | '
-          '${_fmt(nici[i])} | ${_fmt(nici2[i])} | ${_fmt(w[i])} | ${_fmt(fi[i])} | '
-          '${_fmt(dens[i])} | ${_fmt(ecc[i])} | ${_fmt(ecd[i])} | ${_fmt(fec[i])} | ${_fmt(fcd[i])}');
+          '[${_fmt(a[i])} ; ${_fmt(b[i])}[  c=${_fmt(c[i])}  n=${_fmt(ni[i])}  '
+          'nc=${_fmt(nici[i])}  nc²=${_fmt(nici2[i])}  ECC=${_fmt(ecc[i])}  FEC=${_fmt(fec[i])}');
     }
-    buf.writeln();
-    buf.writeln(
-        '${loc.t('Moyenne', 'Mean')} x̄ = Σ nᵢcᵢ / N = ${_fmt(mean)}');
-    buf.writeln(
-        '${loc.t('Variance', 'Variance')} = ${_fmt(variance)}    σ = ${_fmt(std)}');
-    buf.writeln(
-        '${loc.t('Classe médiane', 'Median class')} : [${_fmt(a[medIdx])} ; ${_fmt(b[medIdx])}[');
-    buf.writeln(
-        '${loc.t('Médiane', 'Median')} ≈ ${_fmt(median)}');
-    buf.writeln(
-        '${loc.t('Classe modale', 'Modal class')} : [${_fmt(a[modIdx])} ; ${_fmt(b[modIdx])}[');
-    buf.writeln('${loc.t('Mode', 'Mode')} ≈ ${_fmt(mode)}');
-    buf.writeln();
-    buf.writeln(
-        '${loc.t('Point moyen du nuage', 'Mean point of the cloud')} : G(${_fmt(mean)} ; 0)');
-
+    buf.writeln('x̄=${_fmt(mean)}  Med≈${_fmt(median)}  Mode≈${_fmt(mode)}  σ=${_fmt(std)}');
+    buf.writeln('G(${_fmt(mean)} ; 0)');
     setState(() {
       _result =
-          '${loc.t('Moyenne', 'Mean')} x̄ = ${_fmt(mean)}\n'
-          '${loc.t('Médiane', 'Median')} ≈ ${_fmt(median)}\n'
-          '${loc.t('Mode', 'Mode')} ≈ ${_fmt(mode)}\n'
-          '${loc.t('Classe modale', 'Modal class')} [${_fmt(a[modIdx])} ; ${_fmt(b[modIdx])}[\n'
-          'G(${_fmt(mean)} ; 0)\n'
-          'σ = ${_fmt(std)}';
+          'x̄=${_fmt(mean)}\nMed≈${_fmt(median)}\nMode≈${_fmt(mode)}\nG(${_fmt(mean)} ; 0)';
       _steps = buf.toString();
     });
   }
@@ -334,153 +273,124 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocaleProvider>();
-
     return Scaffold(
       appBar: AppBar(title: Text(loc.t('Statistiques', 'Statistics'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<String>(
-              segments: [
-                ButtonSegment(
-                    value: '1d', label: Text(loc.t('Série', 'Series'))),
-                ButtonSegment(
-                    value: '2d', label: Text(loc.t('x / y', 'x / y'))),
-                ButtonSegment(
-                    value: 'grouped',
-                    label: Text(loc.t('Groupées', 'Grouped'))),
-              ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() {
-                _mode = s.first;
-                _result = '';
-                _steps = '';
-              }),
-            ),
+          SegmentedButton<String>(
+            segments: [
+              ButtonSegment(value: '1d', label: Text(loc.t('Série', 'Series'))),
+              ButtonSegment(value: '2d', label: Text(loc.t('x / y', 'x / y'))),
+              ButtonSegment(
+                  value: 'grouped', label: Text(loc.t('Groupées', 'Grouped'))),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (s) => setState(() {
+              _mode = s.first;
+              _result = '';
+              _steps = '';
+            }),
           ),
           const SizedBox(height: 16),
-          if (_mode == '1d') ...[
+          if (_mode == '1d')
             TextField(
               controller: _seriesCtrl,
               maxLines: 3,
               decoration: InputDecoration(
-                labelText: loc.t(
-                    'Données (espaces ou virgules)', 'Data (spaces or commas)'),
+                labelText: loc.t('Données', 'Data'),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
-            ),
-          ] else if (_mode == '2d') ...[
-            Row(
-              children: [
-                Text(loc.t('Lignes : ', 'Rows: ')),
-                DropdownButton<int>(
-                  value: _n,
-                  items: [2, 3, 4, 5, 6, 8, 10]
-                      .map((e) =>
-                          DropdownMenuItem(value: e, child: Text('$e')))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) _resizeXy(v);
-                  },
-                ),
-              ],
-            ),
+            )
+          else if (_mode == '2d') ...[
+            Row(children: [
+              Text(loc.t('Lignes : ', 'Rows: ')),
+              DropdownButton<int>(
+                value: _n,
+                items: [2, 3, 4, 5, 6, 8, 10]
+                    .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) _resizeXy(v);
+                },
+              ),
+            ]),
             ...List.generate(_n, (i) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _xCtrls[i],
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: 'x${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
+                child: Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _xCtrls[i],
+                      decoration: InputDecoration(
+                        isDense: true,
+                        labelText: 'x${i + 1}',
+                        border: const OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _yCtrls[i],
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: 'y${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _yCtrls[i],
+                      decoration: InputDecoration(
+                        isDense: true,
+                        labelText: 'y${i + 1}',
+                        border: const OutlineInputBorder(),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ]),
               );
             }),
           ] else ...[
-            Text(
-              loc.t(
-                'Classes [aᵢ ; bᵢ[  (fermées à gauche, ouvertes à droite)',
-                'Classes [aᵢ ; bᵢ[  (closed left, open right)',
+            Row(children: [
+              Text(loc.t('Classes : ', 'Classes: ')),
+              DropdownButton<int>(
+                value: _nClasses,
+                items: [2, 3, 4, 5, 6, 8, 10]
+                    .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) _resizeGrouped(v);
+                },
               ),
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-            ),
-            Row(
-              children: [
-                Text(loc.t('Nb de classes : ', 'Classes: ')),
-                DropdownButton<int>(
-                  value: _nClasses,
-                  items: [2, 3, 4, 5, 6, 8, 10]
-                      .map((e) =>
-                          DropdownMenuItem(value: e, child: Text('$e')))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) _resizeGrouped(v);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
+            ]),
             ...List.generate(_nClasses, (i) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _aCtrls[i],
-                        decoration: InputDecoration(
+                child: Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _aCtrls[i],
+                      decoration: InputDecoration(
                           isDense: true,
                           labelText: 'a${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
+                          border: const OutlineInputBorder()),
                     ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: TextField(
-                        controller: _bCtrls[i],
-                        decoration: InputDecoration(
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: TextField(
+                      controller: _bCtrls[i],
+                      decoration: InputDecoration(
                           isDense: true,
                           labelText: 'b${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
+                          border: const OutlineInputBorder()),
                     ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: TextField(
-                        controller: _niCtrls[i],
-                        decoration: InputDecoration(
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: TextField(
+                      controller: _niCtrls[i],
+                      decoration: InputDecoration(
                           isDense: true,
                           labelText: 'n${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
+                          border: const OutlineInputBorder()),
                     ),
-                  ],
-                ),
+                  ),
+                ]),
               );
             }),
           ],
@@ -490,19 +400,16 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             icon: const Icon(Icons.calculate),
             label: Text(loc.t('Calculer', 'Compute')),
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-            ),
+                minimumSize: const Size.fromHeight(48)),
           ),
           if (_result.isNotEmpty) ...[
             const SizedBox(height: 16),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(14),
-                child: Text(
-                  _result,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, height: 1.5, fontSize: 15),
-                ),
+                child: Text(_result,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, height: 1.5, fontSize: 15)),
               ),
             ).animate().fadeIn(),
             const SizedBox(height: 10),
@@ -512,16 +419,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      loc.t('Tableau & détails', 'Table & details'),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                    Text(loc.t('Détails', 'Details'),
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    SelectableText(
-                      _steps,
-                      style: const TextStyle(
-                          fontFamily: 'monospace', height: 1.35, fontSize: 11),
-                    ),
+                    SelectableText(_steps,
+                        style: const TextStyle(height: 1.4, fontSize: 12)),
                   ],
                 ),
               ),

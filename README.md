@@ -71,3 +71,6 @@ lib/
 ## Notes
 
 Ce projet a été conçu pour fournir une calculatrice polyvalente, éducative et autonome, avec un accès rapide à plusieurs modules de calcul avancés.
+
+LICENCE:
+Projet personnel NEMMEGNE CHEPING ALEXANDRE MERVIN 

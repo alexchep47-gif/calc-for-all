@@ -23,18 +23,41 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   bool _justCalculated = false;
   bool _shift = false;
   final OcrService _ocrService = OcrService();
+  String _angleMode = 'rad';
+  String _displayMode = 'norm';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is String && args.trim().isNotEmpty) {
+        final expr = args.trim();
+        setState(() {
+          _expression = expr;
+          _result = _service.evaluate(expr);
+          _justCalculated = true;
+        });
+      }
+    });
+  }
 
   Future<void> _scanExpression() async {
     final expression = await _ocrService.recognizeExpression();
     if (!mounted) return;
     if (expression == null || expression.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OCR : image illisible ou moteur Tesseract.js non chargé. Vérifiez la connexion puis réessayez.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'OCR : image illisible. Réessayez avec une photo nette.')));
       return;
     }
-    setState(() { _expression = expression; _result = '0'; _justCalculated = false; });
+    final res = _service.evaluate(expression);
+    setState(() {
+      _expression = expression;
+      _result = res;
+      _justCalculated = true;
+    });
   }
-  String _angleMode = 'rad';
-  String _displayMode = 'norm';
 
   void _onButtonPressed(String value) {
     HapticFeedback.lightImpact();
@@ -244,8 +267,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   String _formatResult(String raw) {
+    if (raw == CalculatorService.mathError) return raw;
     final v = double.tryParse(raw.replaceAll(',', '.'));
-    if (v == null) return MathPretty.format(raw);
+    if (v == null) {
+      // déjà une chaîne formatée ou erreur
+      if (raw.contains('Erreur') || raw.contains('Indéfini')) {
+        return CalculatorService.mathError;
+      }
+      return MathPretty.format(raw);
+    }
     if (_displayMode == 'sci') {
       return MathPretty.format(v.toStringAsExponential(6));
     }
@@ -394,8 +424,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   const SizedBox(height: 6),
                   Text(
                     _result,
-                    style: const TextStyle(
-                        fontSize: 36, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w700,
+                      color: _result == CalculatorService.mathError
+                          ? Colors.red.shade700
+                          : null,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -414,9 +449,24 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   _buildRow(['4', '5', '6', '−']),
                   _buildRow(['1', '2', '3', '+']),
                   _buildRow(['0', ',', 'π', '=']),
-                  _buildRow([_shift ? 'sec' : 'sin', _shift ? 'csc' : 'cos', _shift ? 'cot' : 'tan', '√']),
-                  _buildRow([_shift ? 'arsin' : 'sh', _shift ? 'arcos' : 'ch', _shift ? 'artan' : 'th', _shift ? 'arcotan' : 'agsh']),
-                  _buildRow([_shift ? 'agsh' : 'agch', _shift ? 'agch' : 'agth', 'agth', 'sec']),
+                  _buildRow([
+                    _shift ? 'sec' : 'sin',
+                    _shift ? 'csc' : 'cos',
+                    _shift ? 'cot' : 'tan',
+                    '√'
+                  ]),
+                  _buildRow([
+                    _shift ? 'arsin' : 'sh',
+                    _shift ? 'arcos' : 'ch',
+                    _shift ? 'artan' : 'th',
+                    _shift ? 'arcotan' : 'agsh'
+                  ]),
+                  _buildRow([
+                    _shift ? 'agsh' : 'agch',
+                    _shift ? 'agch' : 'agth',
+                    'agth',
+                    'sec'
+                  ]),
                   _buildRow(['log', 'ln', 'xʸ', 'ⁿ√']),
                   _buildRow(['(', ')', 'e', '!']),
                   _buildRow(['C', '⌫', '.', '%']),

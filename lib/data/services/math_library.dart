@@ -19,6 +19,9 @@ class MathLibrary {
     'sin',
     'cos',
     'tan',
+    'sec',
+    'csc',
+    'cot',
     'asin',
     'acos',
     'atan',
@@ -46,6 +49,20 @@ class MathLibrary {
   static double sin(double x) => math.sin(x);
   static double cos(double x) => math.cos(x);
   static double tan(double x) => math.tan(x);
+  static double sec(double x) {
+    final c = math.cos(x);
+    return c.abs() < epsilon ? double.nan : 1 / c;
+  }
+
+  static double csc(double x) {
+    final s = math.sin(x);
+    return s.abs() < epsilon ? double.nan : 1 / s;
+  }
+
+  static double cot(double x) {
+    final s = math.sin(x);
+    return s.abs() < epsilon ? double.nan : math.cos(x) / s;
+  }
   static double asin(double x) => x.abs() <= 1 ? math.asin(x) : double.nan;
   static double acos(double x) => x.abs() <= 1 ? math.acos(x) : double.nan;
   static double atan(double x) => math.atan(x);
@@ -107,6 +124,12 @@ class MathLibrary {
         return cos(a);
       case 'tan':
         return tan(a);
+      case 'sec':
+        return sec(a);
+      case 'csc':
+        return csc(a);
+      case 'cot':
+        return cot(a);
       case 'asin':
         return asin(a);
       case 'acos':

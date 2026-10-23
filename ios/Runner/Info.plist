@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Calc For All utilise la caméra pour lire une expression mathématique.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Calc For All utilise vos photos pour lire une expression mathématique.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

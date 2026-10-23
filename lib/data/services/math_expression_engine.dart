@@ -594,6 +594,26 @@ class _Function extends _Node {
           d,
           _Binary('^', _Function('cos', argument), _Number(2)),
         );
+      case 'sec':
+        return _Binary(
+          '*',
+          _Binary('*', _Function('sec', argument), _Function('tan', argument)),
+          d,
+        );
+      case 'csc':
+        return _Unary(
+          '-',
+          _Binary(
+            '*',
+            _Binary('*', _Function('csc', argument), _Function('cot', argument)),
+            d,
+          ),
+        );
+      case 'cot':
+        return _Unary(
+          '-',
+          _Binary('/', d, _Binary('^', _Function('sin', argument), _Number(2))),
+        );
       case 'sqrt':
         return _Binary(
           '/',

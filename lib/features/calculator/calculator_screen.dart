@@ -5,6 +5,7 @@ import '../../core/routes/app_routes.dart';
 import '../../data/services/calculator_service.dart';
 import '../../data/services/math_library.dart';
 import '../../data/services/math_pretty.dart';
+import '../../data/services/ocr_service.dart';
 import '../../data/storage/local_storage.dart';
 
 /// Calculatrice scientifique — ⁿ√ simplifiée, Mode, Shift, virgule
@@ -21,6 +22,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   String _result = '0';
   bool _justCalculated = false;
   bool _shift = false;
+  final OcrService _ocrService = OcrService();
+
+  Future<void> _scanExpression() async {
+    final expression = await _ocrService.recognizeExpression();
+    if (!mounted) return;
+    if (expression == null || expression.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OCR indisponible sur le Web ou image illisible. Utilisez une photo nette sur Android/iOS.')));
+      return;
+    }
+    setState(() { _expression = expression; _result = '0'; _justCalculated = false; });
+  }
   String _angleMode = 'rad';
   String _displayMode = 'norm';
 
@@ -85,6 +97,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           break;
         case '√':
           _expression += _shift ? 'cbrt(' : 'sqrt(';
+          _shift = false;
+          break;
+        case 'sec':
+          _expression += 'sec(';
+          _shift = false;
+          break;
+        case 'csc':
+          _expression += 'csc(';
+          _shift = false;
+          break;
+        case 'cot':
+          _expression += 'cot(';
           _shift = false;
           break;
         case 'sin':
@@ -303,6 +327,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             onPressed: () => Navigator.pushNamed(context, AppRoutes.graph),
           ),
           IconButton(
+            icon: const Icon(Icons.document_scanner_rounded),
+            tooltip: 'Lire une expression avec l’OCR',
+            onPressed: _scanExpression,
+          ),
+          IconButton(
             icon: const Icon(Icons.settings_rounded),
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
           ),
@@ -367,7 +396,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   _buildRow(['4', '5', '6', '−']),
                   _buildRow(['1', '2', '3', '+']),
                   _buildRow(['0', ',', 'π', '=']),
-                  _buildRow(['sin', 'cos', 'tan', '√']),
+                  _buildRow([_shift ? 'sec' : 'sin', _shift ? 'csc' : 'cos', _shift ? 'cot' : 'tan', '√']),
                   _buildRow(['log', 'ln', 'xʸ', 'ⁿ√']),
                   _buildRow(['(', ')', 'e', '!']),
                   _buildRow(['C', '⌫', '.', '%']),

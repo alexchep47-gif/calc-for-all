@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
 
 /// Bibliothèque mathématique interne (jamais affichée sous ce nom dans l’UI).
 class MathLibrary {
@@ -242,3 +243,4 @@ class ComplexScreen extends StatelessWidget {
     );
   }
 }
+

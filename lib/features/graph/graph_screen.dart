@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -478,3 +479,4 @@ class _CurvePainter extends CustomPainter {
       oldDelegate.yMax != yMax;
 }
 
+path="lib/features/graph/graph_screen.dart"}],

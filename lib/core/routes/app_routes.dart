@@ -46,7 +46,7 @@ class AppRoutes {
         onboarding: (context) => const OnboardingScreen(),
         home: (context) => const HomeScreen(),
         calculator: (context) => const CalculatorScreen(),
-        graph: (context) => const SolverScreen(),
+        graph: (context) => const GraphScreen(),
         complex: (context) => const ComplexScreen(),
         history: (context) => const HistoryScreen(),
         settings: (context) => const SettingsScreen(),

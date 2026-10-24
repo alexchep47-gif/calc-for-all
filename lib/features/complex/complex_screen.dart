@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-
 /// Bibliothèque mathématique interne (jamais affichée sous ce nom dans l’UI).
 class MathLibrary {
   static const double pi = math.pi;
@@ -74,22 +72,10 @@ class MathLibrary {
     s = s.replaceAll('π', 'pi').replaceAll('Π', 'pi');
     s = s.replaceAllMapped(RegExp(r'\bln\s*\('), (_) => 'log(');
     s = s.replaceAllMapped(RegExp(r'\bin\s*\('), (_) => 'log(');
-    s = s.replaceAllMapped(
-      RegExp(r'(\d)\s*([a-zA-Z(])'),
-      (m) => '${m[1]}*${m[2]}',
-    );
-    s = s.replaceAllMapped(
-      RegExp(r'\)\s*(\d)'),
-      (m) => ')*${m[1]}',
-    );
-    s = s.replaceAllMapped(
-      RegExp(r'\)\s*([a-zA-Z(])'),
-      (m) => ')*${m[1]}',
-    );
-    s = s.replaceAllMapped(
-      RegExp(r'(\d)\s*pi\b'),
-      (m) => '${m[1]}*pi',
-    );
+    s = s.replaceAllMapped(RegExp(r'(\d)\s*([a-zA-Z(])'), (m) => '${m[1]}*${m[2]}');
+    s = s.replaceAllMapped(RegExp(r'\)\s*(\d)'), (m) => ')*${m[1]}');
+    s = s.replaceAllMapped(RegExp(r'\)\s*([a-zA-Z(])'), (m) => ')*${m[1]}');
+    s = s.replaceAllMapped(RegExp(r'(\d)\s*pi\b'), (m) => '${m[1]}*pi');
     return s;
   }
 
@@ -121,18 +107,13 @@ class MathLibrary {
 
   static String? _symbolicForm(double value) {
     const eps = 1e-7;
-
     final absVal = value.abs();
 
-    if ((absVal - math.e).abs() < eps) {
-      return value < 0 ? '-e' : 'e';
-    }
+    if ((absVal - math.e).abs() < eps) return value < 0 ? '-e' : 'e';
 
     final piRatio = value / math.pi;
     final piRounded = piRatio.roundToDouble();
-    if ((piRatio - piRounded).abs() < eps) {
-      return _piMultipleLabel(piRounded);
-    }
+    if ((piRatio - piRounded).abs() < eps) return _piMultipleLabel(piRounded);
 
     final fracPi = _simplePiFraction(value);
     if (fracPi != null) return fracPi;
@@ -156,7 +137,6 @@ class MathLibrary {
 
     if ((value - 1).abs() < eps) return '1';
     if ((value + 1).abs() < eps) return '-1';
-
     return null;
   }
 
@@ -172,17 +152,9 @@ class MathLibrary {
       final n = (num ~/ g);
       final d = (1000 ~/ g);
       if (d == 1) {
-        return n == 1
-            ? 'π'
-            : n == -1
-                ? '-π'
-                : '${n}π';
+        return n == 1 ? 'π' : n == -1 ? '-π' : '${n}π';
       }
-      return n == 1
-          ? 'π/$d'
-          : n == -1
-              ? '-π/$d'
-              : '${n}π/$d';
+      return n == 1 ? 'π/$d' : n == -1 ? '-π/$d' : '${n}π/$d';
     }
     return null;
   }
@@ -227,12 +199,8 @@ class MathLibrary {
   static String formatArgAsPi(double arg) {
     if (arg.isNaN) return 'Erreur mathématique';
     var a = arg;
-    while (a > math.pi) {
-      a -= 2 * math.pi;
-    }
-    while (a <= -math.pi) {
-      a += 2 * math.pi;
-    }
+    while (a > math.pi) a -= 2 * math.pi;
+    while (a <= -math.pi) a += 2 * math.pi;
     if (a.abs() < 1e-10) return '0';
 
     final r = a / math.pi;

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../data/models/complex_number.dart';
@@ -16,15 +18,20 @@ class _ComplexScreenState extends State<ComplexScreen> {
   final _service = ComplexService();
   final _aController = TextEditingController(text: '3+4i');
   final _bController = TextEditingController(text: '1-2i');
+  final _rootInputController = TextEditingController(text: '1+0i');
+  final _rootIndexController = TextEditingController(text: '3');
 
   ComplexOperation _operation = ComplexOperation.add;
   String _resultText = '7+2i';
   String _detailsText = 'Z = (3+4i) + (1-2i) = 4+2i';
+  String _nthRootsText = 'z₀ = 1\nz₁ = cos(2π/3)+i sin(2π/3)\nz₂ = cos(4π/3)+i sin(4π/3)';
 
   @override
   void dispose() {
     _aController.dispose();
     _bController.dispose();
+    _rootInputController.dispose();
+    _rootIndexController.dispose();
     super.dispose();
   }
 
@@ -72,6 +79,33 @@ class _ComplexScreenState extends State<ComplexScreen> {
       setState(() {
         _resultText = 'Erreur';
         _detailsText = 'Division par zéro ou calcul impossible.';
+      });
+    }
+  }
+
+  void _calculateNthRoots() {
+    final z = _service.parse(_rootInputController.text);
+    final n = int.tryParse(_rootIndexController.text);
+    if (z == null || n == null || n <= 0) {
+      setState(() {
+        _nthRootsText = 'Entrée invalide. Entrez un nombre complexe et un entier n > 0.';
+      });
+      return;
+    }
+
+    try {
+      final roots = _service.nthRoots(z, n);
+      final lines = <String>[];
+      for (var i = 0; i < roots.length; i++) {
+        final root = roots[i];
+        lines.add('z${i} = ${root.toString()}');
+      }
+      setState(() {
+        _nthRootsText = lines.join('\n');
+      });
+    } catch (_) {
+      setState(() {
+        _nthRootsText = 'Calcul impossible pour cette valeur.';
       });
     }
   }
@@ -199,6 +233,59 @@ class _ComplexScreenState extends State<ComplexScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
+                      'Racines n-ièmes',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _rootInputController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre complexe z',
+                        hintText: '1+i',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _rootIndexController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Indice n (racines n-ièmes)',
+                        hintText: '3',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _calculateNthRoots,
+                        icon: const Icon(Icons.autorenew_outlined),
+                        label: const Text('Calculer les racines'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Résultats',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _nthRootsText,
+                      style: const TextStyle(height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
                       'Exemples',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
@@ -232,6 +319,14 @@ class _ComplexScreenState extends State<ComplexScreen> {
                             _bController.text = '2-i';
                             _operation = ComplexOperation.divide;
                             _calculate();
+                          },
+                        ),
+                        _ExampleChip(
+                          label: '1, n=3',
+                          onTap: () {
+                            _rootInputController.text = '1';
+                            _rootIndexController.text = '3';
+                            _calculateNthRoots();
                           },
                         ),
                       ],

@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../data/services/export_watermark.dart';
 import '../../data/services/function_analysis_service.dart';
 import '../../data/services/graph_service.dart';
+import '../../data/services/math_expression_engine.dart';
 
 class GraphScreen extends StatefulWidget {
   const GraphScreen({super.key});
@@ -24,6 +25,7 @@ class _GraphScreenState extends State<GraphScreen> {
   final GraphService _graphService = GraphService();
   final FunctionAnalysisService _analysisService = FunctionAnalysisService();
   final GlobalKey _graphKey = GlobalKey();
+  final MathExpressionEngine _engine = MathExpressionEngine();
 
   String _expression = 'sin(x)';
   FunctionStudyResult? _study;
@@ -46,6 +48,57 @@ class _GraphScreenState extends State<GraphScreen> {
       _expression = expr.isEmpty ? 'sin(x)' : expr;
       _study = _analysisService.analyze(_expression, xMin: -10, xMax: 10);
     });
+  }
+
+  List<double> _rootCandidates() {
+    final expr = _expression.trim();
+    if (expr.isEmpty) return const [];
+
+    final roots = <double>[];
+    const n = 4000;
+    final step = 20.0 / n;
+    double? prevX;
+    double? prevY;
+
+    for (var i = 0; i <= n; i++) {
+      final x = -10 + i * step;
+      final y = _engine.evaluate(expr, x);
+      if (y == null || !y.isFinite) {
+        prevX = null;
+        prevY = null;
+        continue;
+      }
+
+      if (y.abs() < 1e-5) {
+        if (roots.isEmpty || (x - roots.last).abs() > 0.08) {
+          roots.add(x);
+        }
+      } else if (prevY != null && prevX != null && prevY * y < 0) {
+        var a = prevX;
+        var b = x;
+        var fa = prevY;
+        for (var k = 0; k < 20; k++) {
+          final mid = (a + b) / 2;
+          final fm = _engine.evaluate(expr, mid);
+          if (fm == null || !fm.isFinite) break;
+          if (fa * fm <= 0) {
+            b = mid;
+          } else {
+            a = mid;
+            fa = fm;
+          }
+        }
+        final root = (a + b) / 2;
+        if (roots.isEmpty || (root - roots.last).abs() > 0.08) {
+          roots.add(root);
+        }
+      }
+
+      prevX = x;
+      prevY = y;
+    }
+
+    return roots.take(4).toList();
   }
 
   List<List<MapEntry<double, double>>> _curveSegments() {
@@ -88,10 +141,48 @@ class _GraphScreenState extends State<GraphScreen> {
   Future<void> _exportPng() async {
     try {
       final rawBytes = await _renderGraphAsPng();
-      final watermarked = await ExportWatermark.applyToPng(rawBytes);
+      final codec = await ui.instantiateImageCodec(rawBytes);
+      final frame = await codec.getNextFrame();
+      final src = frame.image;
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      final size = Size(src.width.toDouble(), src.height.toDouble());
+      canvas.drawImage(src, Offset.zero, Paint());
+
+      final text = 'Courbe de la fonction f(x)= ${_expression}. Powered by Calc for all';
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 2,
+      )..layout(maxWidth: size.width - 32);
+
+      final bg = Paint()..color = Colors.black.withOpacity(0.35);
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(8, size.height - 56, size.width - 16, 48),
+        const Radius.circular(12),
+      );
+      canvas.drawRRect(rect, bg);
+      textPainter.paint(canvas, Offset(18, size.height - 42));
+
+      final picture = recorder.endRecording();
+      final out = await picture.toImage(src.width, src.height);
+      final pngBytes = await out.toByteData(format: ui.ImageByteFormat.png);
+      final finalBytes = pngBytes!.buffer.asUint8List();
+
+      src.dispose();
+      out.dispose();
+
       await Share.shareXFiles([
         XFile.fromData(
-          watermarked,
+          finalBytes,
           name: 'courbe_${DateTime.now().millisecondsSinceEpoch}.png',
           mimeType: 'image/png',
         ),
@@ -106,30 +197,47 @@ class _GraphScreenState extends State<GraphScreen> {
 
   Future<void> _exportPdf() async {
     try {
-      final rawBytes = await _renderGraphAsPng();
-      final watermarked = await ExportWatermark.applyToPng(rawBytes);
+      final graphPng = await _renderGraphAsPng();
       final pdf = pw.Document();
+      final studyText = _buildStudyText();
+
       pdf.addPage(
-        pw.Page(
+        pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
-          build: (contextPdf) {
-            return pw.Stack(
-              children: [
-                pw.Positioned.fill(
-                  child: pw.Center(
-                    child: pw.Container(
-                      width: PdfPageFormat.a4.width,
-                      height: PdfPageFormat.a4.height,
-                      child: pw.Image(
-                        pw.MemoryImage(watermarked),
-                        fit: pw.BoxFit.contain,
-                      ),
-                    ),
+          build: (pw.Context context) {
+            return [
+              pw.Center(
+                child: pw.Container(
+                  width: PdfPageFormat.a4.width * 0.9,
+                  height: PdfPageFormat.a4.height * 0.45,
+                  child: pw.Image(
+                    pw.MemoryImage(graphPng),
+                    fit: pw.BoxFit.contain,
                   ),
                 ),
-                ExportWatermark.pdfBackground(PdfPageFormat.a4),
-              ],
-            );
+              ),
+              pw.SizedBox(height: 18),
+              pw.Text(
+                'Étude de la fonction',
+                style: const pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 12),
+              pw.Text(
+                studyText,
+                style: const pw.TextStyle(fontSize: 10),
+              ),
+              pw.SizedBox(height: 16),
+              pw.Text(
+                'Powered by Calc for all',
+                style: pw.TextStyle(
+                  color: PdfColors.grey,
+                  fontStyle: pw.FontStyle.italic,
+                ),
+              ),
+            ];
           },
         ),
       );
@@ -150,10 +258,45 @@ class _GraphScreenState extends State<GraphScreen> {
     }
   }
 
+  String _buildStudyText() {
+    final study = _study;
+    if (study == null) {
+      return 'Aucune étude disponible.';
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('Fonction : f(x) = ${_expression}');
+    buffer.writeln('Domaine : ${study.domain}');
+    buffer.writeln('Dérivée : ${study.derivative}');
+    buffer.writeln('Dérivée seconde : ${study.secondDerivative}');
+    buffer.writeln('Période : ${study.period}');
+    buffer.writeln('Parité : ${study.symmetry}');
+    buffer.writeln();
+    buffer.writeln('Racines :');
+    for (final item in study.roots) {
+      buffer.writeln('- $item');
+    }
+    buffer.writeln();
+    buffer.writeln('Extrema :');
+    for (final item in study.extrema) {
+      buffer.writeln('- $item');
+    }
+    buffer.writeln();
+    buffer.writeln('Asymptotes :');
+    for (final item in study.asymptotes) {
+      buffer.writeln('- $item');
+    }
+    buffer.writeln();
+    buffer.writeln('Tableau de variation :');
+    buffer.writeln(study.variationTable);
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final segments = _curveSegments();
     final study = _study;
+    final roots = _rootCandidates();
 
     return Scaffold(
       appBar: AppBar(
@@ -224,6 +367,7 @@ class _GraphScreenState extends State<GraphScreen> {
                     child: CustomPaint(
                       painter: _CurvePainter(
                         segments: segments,
+                        roots: roots,
                         xMin: -10,
                         xMax: 10,
                         yMin: -10,
@@ -346,6 +490,7 @@ class _InfoRow extends StatelessWidget {
 
 class _CurvePainter extends CustomPainter {
   final List<List<MapEntry<double, double>>> segments;
+  final List<double> roots;
   final double xMin;
   final double xMax;
   final double yMin;
@@ -353,6 +498,7 @@ class _CurvePainter extends CustomPainter {
 
   const _CurvePainter({
     required this.segments,
+    required this.roots,
     required this.xMin,
     required this.xMax,
     required this.yMin,
@@ -382,6 +528,10 @@ class _CurvePainter extends CustomPainter {
       ..strokeWidth = 2.4
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
+
+    final rootPaint = Paint()
+      ..color = Colors.redAccent
+      ..style = PaintingStyle.fill;
 
     final xRange = xMax - xMin;
     final yRange = yMax - yMin;
@@ -443,6 +593,12 @@ class _CurvePainter extends CustomPainter {
       canvas.drawPath(path, curvePaint);
     }
 
+    for (final root in roots) {
+      final px = xToPx(root);
+      final py = yToPy(0.0);
+      canvas.drawCircle(Offset(px, py), 5, rootPaint);
+    }
+
     final labelStyle = const TextStyle(
       color: Colors.white70,
       fontSize: 10,
@@ -473,6 +629,7 @@ class _CurvePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CurvePainter oldDelegate) =>
       oldDelegate.segments != segments ||
+      oldDelegate.roots != roots ||
       oldDelegate.xMin != xMin ||
       oldDelegate.xMax != xMax ||
       oldDelegate.yMin != yMin ||

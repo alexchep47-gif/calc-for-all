@@ -25,11 +25,11 @@ class MathLibrary {
       case 'atan':
         return math.atan(a);
       case 'sinh':
-        return math.sinh(a);
+        return sinh(a);
       case 'cosh':
-        return math.cosh(a);
+        return cosh(a);
       case 'tanh':
-        return math.tanh(a);
+        return tanh(a);
       case 'log':
       case 'ln':
         return ln(a);
@@ -46,6 +46,19 @@ class MathLibrary {
       default:
         throw ArgumentError('Unsupported unary function: $name');
     }
+  }
+
+  static double sinh(double x) {
+    return (math.exp(x) - math.exp(-x)) / 2;
+  }
+
+  static double cosh(double x) {
+    return (math.exp(x) + math.exp(-x)) / 2;
+  }
+
+  static double tanh(double x) {
+    final e = math.exp(2 * x);
+    return (e - 1) / (e + 1);
   }
 
   static double clean(double v) {

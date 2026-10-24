@@ -479,4 +479,3 @@ class _CurvePainter extends CustomPainter {
       oldDelegate.yMax != yMax;
 }
 
-path="lib/features/graph/graph_screen.dart"}],

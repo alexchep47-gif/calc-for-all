@@ -10,6 +10,44 @@ class MathLibrary {
     'log', 'ln', 'log10', 'exp', 'sqrt', 'cbrt', 'abs',
   };
 
+  static double call1(String name, double a) {
+    switch (name) {
+      case 'sin':
+        return math.sin(a);
+      case 'cos':
+        return math.cos(a);
+      case 'tan':
+        return math.tan(a);
+      case 'asin':
+        return math.asin(a);
+      case 'acos':
+        return math.acos(a);
+      case 'atan':
+        return math.atan(a);
+      case 'sinh':
+        return math.sinh(a);
+      case 'cosh':
+        return math.cosh(a);
+      case 'tanh':
+        return math.tanh(a);
+      case 'log':
+      case 'ln':
+        return ln(a);
+      case 'log10':
+        return log10(a);
+      case 'exp':
+        return math.exp(a);
+      case 'sqrt':
+        return math.sqrt(a);
+      case 'cbrt':
+        return cbrt(a);
+      case 'abs':
+        return a.abs();
+      default:
+        throw ArgumentError('Unsupported unary function: $name');
+    }
+  }
+
   static double clean(double v) {
     if (v.isNaN || v.isInfinite) return v;
     final r = v.roundToDouble();
@@ -148,4 +186,3 @@ class MathLibrary {
     return a == 0 ? 1 : a;
   }
 }
-

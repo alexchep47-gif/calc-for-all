@@ -1,5 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
+
+import '../../data/services/export_watermark.dart';
+import '../../data/services/function_analysis_service.dart';
 import '../../data/services/graph_service.dart';
 
 class GraphScreen extends StatefulWidget {
@@ -13,8 +21,17 @@ class _GraphScreenState extends State<GraphScreen> {
   final TextEditingController _expressionController =
       TextEditingController(text: 'sin(x)');
   final GraphService _graphService = GraphService();
+  final FunctionAnalysisService _analysisService = FunctionAnalysisService();
+  final GlobalKey _graphKey = GlobalKey();
 
   String _expression = 'sin(x)';
+  FunctionStudyResult? _study;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshStudy();
+  }
 
   @override
   void dispose() {
@@ -22,30 +39,141 @@ class _GraphScreenState extends State<GraphScreen> {
     super.dispose();
   }
 
+  void _refreshStudy() {
+    final expr = _expressionController.text.trim();
+    setState(() {
+      _expression = expr.isEmpty ? 'sin(x)' : expr;
+      _study = _analysisService.analyze(_expression, xMin: -10, xMax: 10);
+    });
+  }
+
   List<List<MapEntry<double, double>>> _curveSegments() {
     final expr = _expression.trim();
     if (expr.isEmpty) return const [];
-    return _graphService.evaluateSegments(expr, -10, 10, 2000);
+    final raw = _graphService.evaluateSegments(expr, -10, 10, 2000);
+    return raw
+        .map((segment) => segment
+            .where((point) =>
+                point.key >= -10 &&
+                point.key <= 10 &&
+                point.value >= -10 &&
+                point.value <= 10)
+            .toList())
+        .where((segment) => segment.length >= 2)
+        .toList();
   }
 
   void _applyExpression() {
     final value = _expressionController.text.trim();
-    setState(() {
-      _expression = value.isEmpty ? 'sin(x)' : value;
-    });
+    if (value.isEmpty) {
+      _expressionController.text = 'sin(x)';
+    }
+    _refreshStudy();
+  }
+
+  Future<Uint8List> _renderGraphAsPng() async {
+    final boundary = _graphKey.currentContext?.findRenderObject();
+    if (boundary is! RenderRepaintBoundary) {
+      throw StateError('Graph area is not ready for export.');
+    }
+    final image = await boundary.toImage(pixelRatio: 2.0);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      throw StateError('PNG export failed.');
+    }
+    return byteData.buffer.asUint8List();
+  }
+
+  Future<void> _exportPng() async {
+    try {
+      final rawBytes = await _renderGraphAsPng();
+      final watermarked = await ExportWatermark.applyToPng(rawBytes);
+      await Share.shareXFiles([
+        XFile.fromData(
+          watermarked,
+          name: 'courbe_${DateTime.now().millisecondsSinceEpoch}.png',
+          mimeType: 'image/png',
+        ),
+      ]);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d’exporter l’image PNG.')),
+      );
+    }
+  }
+
+  Future<void> _exportPdf() async {
+    try {
+      final rawBytes = await _renderGraphAsPng();
+      final watermarked = await ExportWatermark.applyToPng(rawBytes);
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (contextPdf) {
+            return pw.Stack(
+              children: [
+                pw.Positioned.fill(
+                  child: pw.Center(
+                    child: pw.Container(
+                      width: PdfPageFormat.a4.width,
+                      height: PdfPageFormat.a4.height,
+                      child: pw.Image(
+                        pw.MemoryImage(watermarked),
+                        fit: pw.BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+                ExportWatermark.pdfBackground(PdfPageFormat.a4),
+              ],
+            );
+          },
+        ),
+      );
+
+      final pdfBytes = await pdf.save();
+      await Share.shareXFiles([
+        XFile.fromData(
+          pdfBytes,
+          name: 'courbe_${DateTime.now().millisecondsSinceEpoch}.pdf',
+          mimeType: 'application/pdf',
+        ),
+      ]);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d’exporter le PDF.')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final segments = _curveSegments();
+    final study = _study;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Graphique'),
+        actions: [
+          IconButton(
+            tooltip: 'Exporter PNG',
+            onPressed: _exportPng,
+            icon: const Icon(Icons.image_outlined),
+          ),
+          IconButton(
+            tooltip: 'Exporter PDF',
+            onPressed: _exportPdf,
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+          ),
+        ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
@@ -81,16 +209,18 @@ class _GraphScreenState extends State<GraphScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF101820),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return CustomPaint(
+            SizedBox(
+              height: 420,
+              child: RepaintBoundary(
+                key: _graphKey,
+                child: ClipRect(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF101820),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: CustomPaint(
                       painter: _CurvePainter(
                         segments: segments,
                         xMin: -10,
@@ -98,12 +228,61 @@ class _GraphScreenState extends State<GraphScreen> {
                         yMin: -10,
                         yMax: 10,
                       ),
-                      size: Size(constraints.maxWidth, constraints.maxHeight),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ),
+            if (study != null) ...[
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Étude de la fonction',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _InfoRow(label: 'Domaine', value: study.domain),
+                      _InfoRow(label: 'Dérivée', value: study.derivative),
+                      _InfoRow(label: 'Dérivée seconde', value: study.secondDerivative),
+                      _InfoRow(label: 'Période', value: study.period),
+                      _InfoRow(label: 'Parité', value: study.symmetry),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Racines',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      ...study.roots.map((item) => Text('• $item')).toList(),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Extrema',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      ...study.extrema.map((item) => Text('• $item')).toList(),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Asymptotes',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      ...study.asymptotes.map((item) => Text('• $item')).toList(),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Tableau de variation',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(study.variationTable),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -112,9 +291,7 @@ class _GraphScreenState extends State<GraphScreen> {
 
   void _setPreset(String value) {
     _expressionController.text = value;
-    setState(() {
-      _expression = value;
-    });
+    _refreshStudy();
   }
 }
 
@@ -137,6 +314,35 @@ class _QuickPresetChip extends StatelessWidget {
   }
 }
 
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: RichText(
+        text: TextSpan(
+          style: DefaultTextStyle.of(context).style,
+          children: [
+            TextSpan(
+              text: '$label : ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CurvePainter extends CustomPainter {
   final List<List<MapEntry<double, double>>> segments;
   final double xMin;
@@ -154,8 +360,12 @@ class _CurvePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final safeRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    canvas.save();
+    canvas.clipRect(safeRect);
+
     final backgroundPaint = Paint()..color = const Color(0xFF101820);
-    canvas.drawRect(Offset.zero & size, backgroundPaint);
+    canvas.drawRect(safeRect, backgroundPaint);
 
     final gridPaint = Paint()
       ..color = Colors.white.withOpacity(0.08)
@@ -209,10 +419,18 @@ class _CurvePainter extends CustomPainter {
     );
 
     for (final segment in segments) {
-      if (segment.length < 2) continue;
+      final validPoints = segment
+          .where((point) =>
+              point.key >= xMin &&
+              point.key <= xMax &&
+              point.value >= yMin &&
+              point.value <= yMax)
+          .toList();
+      if (validPoints.length < 2) continue;
+
       final path = Path();
-      for (var i = 0; i < segment.length; i++) {
-        final point = segment[i];
+      for (var i = 0; i < validPoints.length; i++) {
+        final point = validPoints[i];
         final px = xToPx(point.key);
         final py = yToPy(point.value);
         if (i == 0) {
@@ -224,7 +442,6 @@ class _CurvePainter extends CustomPainter {
       canvas.drawPath(path, curvePaint);
     }
 
-    final labelPaint = Paint()..color = Colors.white70;
     final labelStyle = const TextStyle(
       color: Colors.white70,
       fontSize: 10,
@@ -233,12 +450,11 @@ class _CurvePainter extends CustomPainter {
 
     for (var i = -10; i <= 10; i += 2) {
       final px = xToPx(i.toDouble());
-      final py = yToPy(0.0);
       final textPainter = TextPainter(
         text: TextSpan(text: i.toString(), style: labelStyle),
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(canvas, Offset(px - 4, py + 6));
+      textPainter.paint(canvas, Offset(px - 4, originY + 6));
     }
 
     for (var i = -10; i <= 10; i += 2) {
@@ -249,6 +465,8 @@ class _CurvePainter extends CustomPainter {
       )..layout();
       textPainter.paint(canvas, Offset(originX + 6, py - 8));
     }
+
+    canvas.restore();
   }
 
   @override

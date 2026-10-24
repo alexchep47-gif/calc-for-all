@@ -1,9 +1,8 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../data/models/complex_number.dart';
 import '../../data/services/complex_service.dart';
+import '../../data/services/math_library.dart';
 
 enum ComplexOperation { add, subtract, multiply, divide }
 
@@ -35,14 +34,20 @@ class _ComplexScreenState extends State<ComplexScreen> {
     super.dispose();
   }
 
+  bool get _isEnglish => Localizations.localeOf(context).languageCode == 'en';
+  String _t(String en, String fr) => _isEnglish ? en : fr;
+
   void _calculate() {
     final a = _service.parse(_aController.text);
     final b = _service.parse(_bController.text);
 
     if (a == null || b == null) {
       setState(() {
-        _resultText = 'Entrée invalide';
-        _detailsText = 'Utilise une forme du type 3+4i, -2.5-1.2i, 5i, -i, 7';
+        _resultText = _t('Invalid input', 'Entrée invalide');
+        _detailsText = _t(
+          'Use a form like 3+4i, -2.5-1.2i, 5i, -i, 7',
+          'Utilise une forme du type 3+4i, -2.5-1.2i, 5i, -i, 7',
+        );
       });
       return;
     }
@@ -69,16 +74,19 @@ class _ComplexScreenState extends State<ComplexScreen> {
       final conj = _service.conjugate(result);
 
       setState(() {
-        _resultText = result.toString();
-        _detailsText = 'Module : $mod\n'
-            'Argument : $argDeg\n'
-            'Conjugué : $conj\n'
-            'Forme polaire : ${result.toPolarString()}';
+        _resultText = MathLibrary.sanitizeForDisplay(result.toString());
+        _detailsText = '${_t('Modulus', 'Module')} : $mod\n'
+            '${_t('Argument', 'Argument')} : $argDeg\n'
+            '${_t('Conjugate', 'Conjugué')} : ${MathLibrary.sanitizeForDisplay(conj.toString())}\n'
+            '${_t('Polar form', 'Forme polaire')} : ${MathLibrary.sanitizeForDisplay(result.toPolarString())}';
       });
     } catch (_) {
       setState(() {
-        _resultText = 'Erreur';
-        _detailsText = 'Division par zéro ou calcul impossible.';
+        _resultText = _t('Error', 'Erreur');
+        _detailsText = _t(
+          'Division by zero or impossible calculation.',
+          'Division par zéro ou calcul impossible.',
+        );
       });
     }
   }
@@ -88,7 +96,10 @@ class _ComplexScreenState extends State<ComplexScreen> {
     final n = int.tryParse(_rootIndexController.text);
     if (z == null || n == null || n <= 0) {
       setState(() {
-        _nthRootsText = 'Entrée invalide. Entrez un nombre complexe et un entier n > 0.';
+        _nthRootsText = _t(
+          'Invalid input. Enter a complex number and n > 0.',
+          'Entrée invalide. Entrez un nombre complexe et n > 0.',
+        );
       });
       return;
     }
@@ -98,14 +109,14 @@ class _ComplexScreenState extends State<ComplexScreen> {
       final lines = <String>[];
       for (var i = 0; i < roots.length; i++) {
         final root = roots[i];
-        lines.add('z${i} = ${root.toString()}');
+        lines.add('z${i} = ${MathLibrary.sanitizeForDisplay(root.toString())}');
       }
       setState(() {
         _nthRootsText = lines.join('\n');
       });
     } catch (_) {
       setState(() {
-        _nthRootsText = 'Calcul impossible pour cette valeur.';
+        _nthRootsText = _t('Calculation impossible for this value.', 'Calcul impossible pour cette valeur.');
       });
     }
   }
@@ -121,7 +132,7 @@ class _ComplexScreenState extends State<ComplexScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nombres complexes'),
+        title: Text(_t('Complex numbers', 'Nombres complexes')),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -133,26 +144,17 @@ class _ComplexScreenState extends State<ComplexScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Opération',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Text(
+                      _t('Operation', 'Opération'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     SegmentedButton<ComplexOperation>(
                       segments: const [
                         ButtonSegment(value: ComplexOperation.add, label: Text('+')),
-                        ButtonSegment(
-                          value: ComplexOperation.subtract,
-                          label: Text('-'),
-                        ),
-                        ButtonSegment(
-                          value: ComplexOperation.multiply,
-                          label: Text('×'),
-                        ),
-                        ButtonSegment(
-                          value: ComplexOperation.divide,
-                          label: Text('÷'),
-                        ),
+                        ButtonSegment(value: ComplexOperation.subtract, label: Text('-')),
+                        ButtonSegment(value: ComplexOperation.multiply, label: Text('×')),
+                        ButtonSegment(value: ComplexOperation.divide, label: Text('÷')),
                       ],
                       selected: {_operation},
                       onSelectionChanged: (selection) {
@@ -164,19 +166,19 @@ class _ComplexScreenState extends State<ComplexScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _aController,
-                      decoration: const InputDecoration(
-                        labelText: 'Premier nombre complexe',
+                      decoration: InputDecoration(
+                        labelText: _t('First complex number', 'Premier nombre complexe'),
                         hintText: '3+4i',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _bController,
-                      decoration: const InputDecoration(
-                        labelText: 'Deuxième nombre complexe',
+                      decoration: InputDecoration(
+                        labelText: _t('Second complex number', 'Deuxième nombre complexe'),
                         hintText: '1-2i',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -185,7 +187,7 @@ class _ComplexScreenState extends State<ComplexScreen> {
                       child: FilledButton.icon(
                         onPressed: _calculate,
                         icon: const Icon(Icons.calculate_outlined),
-                        label: const Text('Calculer'),
+                        label: Text(_t('Calculate', 'Calculer')),
                       ),
                     ),
                   ],
@@ -199,26 +201,26 @@ class _ComplexScreenState extends State<ComplexScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Résultat',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      _t('Result', 'Résultat'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${_aController.text} $operationLabel ${_bController.text} = $_resultText',
+                      '${MathLibrary.sanitizeForDisplay(_aController.text)} $operationLabel ${MathLibrary.sanitizeForDisplay(_bController.text)} = ${MathLibrary.sanitizeForDisplay(_resultText)}',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Détails',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      _t('Details', 'Détails'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _detailsText,
+                      MathLibrary.sanitizeForDisplay(_detailsText),
                       style: const TextStyle(height: 1.6),
                     ),
                   ],
@@ -232,27 +234,27 @@ class _ComplexScreenState extends State<ComplexScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Racines n-ièmes',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      _t('n-th roots', 'Racines n-ièmes'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _rootInputController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre complexe z',
+                      decoration: InputDecoration(
+                        labelText: _t('Complex z', 'Nombre complexe z'),
                         hintText: '1+i',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _rootIndexController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Indice n (racines n-ièmes)',
+                      decoration: InputDecoration(
+                        labelText: _t('Index n', 'Indice n'),
                         hintText: '3',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -261,17 +263,17 @@ class _ComplexScreenState extends State<ComplexScreen> {
                       child: FilledButton.icon(
                         onPressed: _calculateNthRoots,
                         icon: const Icon(Icons.autorenew_outlined),
-                        label: const Text('Calculer les racines'),
+                        label: Text(_t('Calculate roots', 'Calculer les racines')),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Résultats',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      _t('Results', 'Résultats'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _nthRootsText,
+                      MathLibrary.sanitizeForDisplay(_nthRootsText),
                       style: const TextStyle(height: 1.6),
                     ),
                   ],
@@ -285,9 +287,9 @@ class _ComplexScreenState extends State<ComplexScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Exemples',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Text(
+                      _t('Examples', 'Exemples'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -313,7 +315,7 @@ class _ComplexScreenState extends State<ComplexScreen> {
                           },
                         ),
                         _ExampleChip(
-                          label: '5i / 2-i',
+                          label: '5i ÷ 2-i',
                           onTap: () {
                             _aController.text = '5i';
                             _bController.text = '2-i';

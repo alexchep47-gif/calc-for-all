@@ -3,9 +3,8 @@ import 'dart:math' as math;
 import '../models/complex_number.dart';
 import 'math_library.dart';
 
-/// Service pour les opérations sur nombres complexes
+/// Service for complex numbers.
 class ComplexService {
-  /// Parse une chaîne du type "3+4i" ou "-2.5-1.2i"
   ComplexNumber? parse(String input) {
     try {
       input = input.replaceAll(' ', '').replaceAll(',', '.').toLowerCase();
@@ -45,7 +44,7 @@ class ComplexService {
 
   List<ComplexNumber> nthRoots(ComplexNumber z, int n) {
     if (n <= 0) {
-      throw ArgumentError('n doit être un entier strictement positif.');
+      throw ArgumentError('n must be a positive integer.');
     }
 
     if (z.real == 0 && z.imag == 0) {

@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-/// Bibliothèque mathématique interne (jamais affichée sous ce nom dans l’UI).
 class MathLibrary {
   static const double pi = math.pi;
   static const double e = math.e;
@@ -18,86 +17,66 @@ class MathLibrary {
     return v;
   }
 
+  static String sanitizeForDisplay(String value) {
+    if (value.trim().isEmpty) return value;
+    var s = value.trim();
+    s = s.replaceAll('·', ' ');
+    s = s.replaceAll('×', ' ');
+    s = s.replaceAll('∗', ' ');
+    s = s.replaceAll('*', ' ');
+    s = s.replaceAll('÷', '/');
+    s = s.replaceAll('^', '');
+    s = s.replaceAllMapped(RegExp(r'([A-Za-zπ])\(([^)]*)\)'), (match) => '${match.group(1)}(${match.group(2)})');
+    s = s.replaceAllMapped(RegExp(r'([0-9A-Za-zπ])\s+([A-Za-z(π])'), (match) => '${match.group(1)}${match.group(2)}');
+    s = s.replaceAllMapped(RegExp(r'([A-Za-zπ0-9])\s+(/)'), (match) => '${match.group(1)}${match.group(2)}');
+    s = s.replaceAllMapped(RegExp(r'([A-Za-zπ])\s*([0-9]+)'), (match) => '${match.group(1)}${_superscriptDigits(match.group(2)!)}');
+    s = s.replaceAllMapped(RegExp(r'([0-9]+)\s*([A-Za-zπ])'), (match) => '${match.group(1)}${match.group(2)}');
+    s = s.replaceAllMapped(RegExp(r'([A-Za-zπ])\s*\(([^)]*)\)'), (match) => '${match.group(1)}(${match.group(2)})');
+    s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return s;
+  }
+
+  static String _superscriptDigits(String digits) {
+    const superscripts = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+    return digits.split('').map((d) => superscripts[int.parse(d)]).join();
+  }
+
   static double pow(double a, double b) => math.pow(a, b).toDouble();
   static double log10(double x) => math.log(x) / math.ln10;
   static double ln(double x) => math.log(x);
 
-  static double call1(String name, double a) {
-    switch (name) {
-      case 'sin':
-        return math.sin(a);
-      case 'cos':
-        return math.cos(a);
-      case 'tan':
-        return math.tan(a);
-      case 'asin':
-        return math.asin(a);
-      case 'acos':
-        return math.acos(a);
-      case 'atan':
-        return math.atan(a);
-      case 'sinh':
-        return (math.exp(a) - math.exp(-a)) / 2;
-      case 'cosh':
-        return (math.exp(a) + math.exp(-a)) / 2;
-      case 'tanh':
-        final e2 = math.exp(2 * a);
-        return (e2 - 1) / (e2 + 1);
-      case 'log':
-      case 'ln':
-        return math.log(a);
-      case 'log10':
-        return log10(a);
-      case 'exp':
-        return math.exp(a);
-      case 'sqrt':
-        return math.sqrt(a);
-      case 'cbrt':
-        return a >= 0
-            ? math.pow(a, 1 / 3).toDouble()
-            : -math.pow(-a, 1 / 3).toDouble();
-      case 'abs':
-        return a.abs();
-    }
-    return double.nan;
+  static double cbrt(double x) {
+    if (x == 0) return 0;
+    final sign = x < 0 ? -1.0 : 1.0;
+    return sign * math.pow(x.abs(), 1 / 3).toDouble();
   }
 
-  /// Normalise 2x → 2*x, ln → log, ^, π…
   static String normalizeExpression(String input) {
     var s = input.trim();
     s = s.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
     s = s.replaceAll('π', 'pi').replaceAll('Π', 'pi');
     s = s.replaceAllMapped(RegExp(r'\bln\s*\('), (_) => 'log(');
     s = s.replaceAllMapped(RegExp(r'\bin\s*\('), (_) => 'log(');
-    // multiplication implicite
-    s = s.replaceAllMapped(
-      RegExp(r'(\d)\s*([a-zA-Z(])'),
-      (m) => '${m[1]}*${m[2]}',
-    );
-    s = s.replaceAllMapped(
-      RegExp(r'\)\s*(\d)'),
-      (m) => ')*${m[1]}',
-    );
-    s = s.replaceAllMapped(
-      RegExp(r'\)\s*([a-zA-Z(])'),
-      (m) => ')*${m[1]}',
-    );
-    s = s.replaceAllMapped(
-      RegExp(r'(\d)\s*pi\b'),
-      (m) => '${m[1]}*pi',
-    );
+    s = s.replaceAllMapped(RegExp(r'(\d)\s*([a-zA-Z(])'), (m) => '${m[1]}*${m[2]}');
+    s = s.replaceAllMapped(RegExp(r'\)\s*(\d)'), (m) => ')*${m[1]}');
+    s = s.replaceAllMapped(RegExp(r'\)\s*([a-zA-Z(])'), (m) => ')*${m[1]}');
+    s = s.replaceAllMapped(RegExp(r'(\d)\s*pi\b'), (m) => '${m[1]}*pi');
     return s;
   }
 
-  /// Affichage : entier si possible, sinon fraction simplifiée (2/2 → 1).
   static String format(double v) {
-    if (v.isNaN) return 'Erreur mathématique';
+    if (v.isNaN) return 'Math error';
     if (v.isInfinite) return v.isNegative ? '-∞' : '+∞';
+
     final c = clean(v);
-    if (c == c.roundToDouble() && c.abs() < 1e15) {
+    if (c == 0) return '0';
+    if ((c - c.roundToDouble()).abs() < 1e-10) {
       return c.toInt().toString();
     }
-    return toSimpleFraction(c) ?? _trimDecimal(c);
+
+    final frac = toSimpleFraction(c);
+    if (frac != null) return frac;
+    return _trimDecimal(c);
   }
 
   static String _trimDecimal(double c) {
@@ -136,17 +115,13 @@ class MathLibrary {
     return '$n/$d';
   }
 
-  /// Argument en fraction de π (ex. π/3, −π/2, 3π/4).
   static String formatArgAsPi(double arg) {
-    if (arg.isNaN) return 'Erreur mathématique';
+    if (arg.isNaN) return 'Math error';
     var a = arg;
-    while (a > math.pi) {
-      a -= 2 * math.pi;
-    }
-    while (a <= -math.pi) {
-      a += 2 * math.pi;
-    }
+    while (a > math.pi) a -= 2 * math.pi;
+    while (a <= -math.pi) a += 2 * math.pi;
     if (a.abs() < 1e-10) return '0';
+
     final r = a / math.pi;
     final frac = toSimpleFraction(r);
     if (frac == null) return '${format(a)} rad';
@@ -160,7 +135,6 @@ class MathLibrary {
       if (n == '-1') return '−π/$d';
       return '$nπ/$d';
     }
-    // entier k → kπ
     if (frac.startsWith('-')) return '−${frac.substring(1)}π';
     return '${frac}π';
   }
@@ -174,3 +148,4 @@ class MathLibrary {
     return a == 0 ? 1 : a;
   }
 }
+

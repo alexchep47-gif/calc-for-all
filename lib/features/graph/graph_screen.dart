@@ -11,6 +11,7 @@ import '../../data/services/export_watermark.dart';
 import '../../data/services/function_analysis_service.dart';
 import '../../data/services/graph_service.dart';
 import '../../data/services/math_expression_engine.dart';
+import '../../data/services/math_library.dart';
 
 class GraphScreen extends StatefulWidget {
   const GraphScreen({super.key});
@@ -41,6 +42,9 @@ class _GraphScreenState extends State<GraphScreen> {
     _expressionController.dispose();
     super.dispose();
   }
+
+  bool get _isEnglish => Localizations.localeOf(context).languageCode == 'en';
+  String _t(String en, String fr) => _isEnglish ? en : fr;
 
   void _refreshStudy() {
     final expr = _expressionController.text.trim();
@@ -149,7 +153,7 @@ class _GraphScreenState extends State<GraphScreen> {
       final size = Size(src.width.toDouble(), src.height.toDouble());
       canvas.drawImage(src, Offset.zero, Paint());
 
-      final text = 'Courbe de la fonction f(x)= ${_expression}. Powered by Calc for all';
+      final text = 'Curve of function f(x)= ${MathLibrary.sanitizeForDisplay(_expression)}. Powered by Calc for all';
       final textPainter = TextPainter(
         text: TextSpan(
           text: text,
@@ -183,14 +187,14 @@ class _GraphScreenState extends State<GraphScreen> {
       await Share.shareXFiles([
         XFile.fromData(
           finalBytes,
-          name: 'courbe_${DateTime.now().millisecondsSinceEpoch}.png',
+          name: 'curve_${DateTime.now().millisecondsSinceEpoch}.png',
           mimeType: 'image/png',
         ),
       ]);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’exporter l’image PNG.')),
+        const SnackBar(content: Text('Unable to export PNG image.')),
       );
     }
   }
@@ -218,7 +222,7 @@ class _GraphScreenState extends State<GraphScreen> {
               ),
               pw.SizedBox(height: 18),
               pw.Text(
-                'Étude de la fonction',
+                _t('Function study', 'Étude de la fonction'),
                 style: const pw.TextStyle(
                   fontSize: 18,
                   fontWeight: pw.FontWeight.bold,
@@ -246,14 +250,14 @@ class _GraphScreenState extends State<GraphScreen> {
       await Share.shareXFiles([
         XFile.fromData(
           pdfBytes,
-          name: 'courbe_${DateTime.now().millisecondsSinceEpoch}.pdf',
+          name: 'curve_${DateTime.now().millisecondsSinceEpoch}.pdf',
           mimeType: 'application/pdf',
         ),
       ]);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’exporter le PDF.')),
+        const SnackBar(content: Text('Unable to export PDF.')),
       );
     }
   }
@@ -261,34 +265,34 @@ class _GraphScreenState extends State<GraphScreen> {
   String _buildStudyText() {
     final study = _study;
     if (study == null) {
-      return 'Aucune étude disponible.';
+      return 'No study available.';
     }
 
     final buffer = StringBuffer();
-    buffer.writeln('Fonction : f(x) = ${_expression}');
-    buffer.writeln('Domaine : ${study.domain}');
-    buffer.writeln('Dérivée : ${study.derivative}');
-    buffer.writeln('Dérivée seconde : ${study.secondDerivative}');
-    buffer.writeln('Période : ${study.period}');
-    buffer.writeln('Parité : ${study.symmetry}');
+    buffer.writeln('Function : f(x) = ${MathLibrary.sanitizeForDisplay(_expression)}');
+    buffer.writeln('Domain : ${MathLibrary.sanitizeForDisplay(study.domain)}');
+    buffer.writeln('Derivative : ${MathLibrary.sanitizeForDisplay(study.derivative)}');
+    buffer.writeln('Second derivative : ${MathLibrary.sanitizeForDisplay(study.secondDerivative)}');
+    buffer.writeln('Period : ${MathLibrary.sanitizeForDisplay(study.period)}');
+    buffer.writeln('Symmetry : ${MathLibrary.sanitizeForDisplay(study.symmetry)}');
     buffer.writeln();
-    buffer.writeln('Racines :');
+    buffer.writeln('Roots :');
     for (final item in study.roots) {
-      buffer.writeln('- $item');
+      buffer.writeln('- ${MathLibrary.sanitizeForDisplay(item)}');
     }
     buffer.writeln();
     buffer.writeln('Extrema :');
     for (final item in study.extrema) {
-      buffer.writeln('- $item');
+      buffer.writeln('- ${MathLibrary.sanitizeForDisplay(item)}');
     }
     buffer.writeln();
     buffer.writeln('Asymptotes :');
     for (final item in study.asymptotes) {
-      buffer.writeln('- $item');
+      buffer.writeln('- ${MathLibrary.sanitizeForDisplay(item)}');
     }
     buffer.writeln();
-    buffer.writeln('Tableau de variation :');
-    buffer.writeln(study.variationTable);
+    buffer.writeln('Variation table :');
+    buffer.writeln(MathLibrary.sanitizeForDisplay(study.variationTable));
     return buffer.toString();
   }
 
@@ -300,15 +304,15 @@ class _GraphScreenState extends State<GraphScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Graphique'),
+        title: Text(_t('Graph', 'Graphique')),
         actions: [
           IconButton(
-            tooltip: 'Exporter PNG',
+            tooltip: _t('Export PNG', 'Exporter PNG'),
             onPressed: _exportPng,
             icon: const Icon(Icons.image_outlined),
           ),
           IconButton(
-            tooltip: 'Exporter PDF',
+            tooltip: _t('Export PDF', 'Exporter PDF'),
             onPressed: _exportPdf,
             icon: const Icon(Icons.picture_as_pdf_outlined),
           ),
@@ -325,8 +329,8 @@ class _GraphScreenState extends State<GraphScreen> {
                   child: TextField(
                     controller: _expressionController,
                     decoration: InputDecoration(
-                      labelText: 'Fonction f(x)',
-                      hintText: 'sin(x), x^2, exp(x), ...',
+                      labelText: _t('Function f(x)', 'Fonction f(x)'),
+                      hintText: 'sin(x), x², exp(x), ...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -337,7 +341,7 @@ class _GraphScreenState extends State<GraphScreen> {
                 const SizedBox(width: 12),
                 FilledButton(
                   onPressed: _applyExpression,
-                  child: const Text('Tracer'),
+                  child: Text(_t('Plot', 'Tracer')),
                 ),
               ],
             ),
@@ -348,7 +352,7 @@ class _GraphScreenState extends State<GraphScreen> {
               children: [
                 _QuickPresetChip(label: 'sin(x)', onTap: () => _setPreset('sin(x)')),
                 _QuickPresetChip(label: 'cos(x)', onTap: () => _setPreset('cos(x)')),
-                _QuickPresetChip(label: 'x^2', onTap: () => _setPreset('x^2')),
+                _QuickPresetChip(label: 'x²', onTap: () => _setPreset('x²')),
                 _QuickPresetChip(label: 'exp(x)', onTap: () => _setPreset('exp(x)')),
               ],
             ),
@@ -386,43 +390,58 @@ class _GraphScreenState extends State<GraphScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Étude de la fonction',
-                        style: TextStyle(
+                      Text(
+                        _t('Function study', 'Étude de la fonction'),
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _InfoRow(label: 'Domaine', value: study.domain),
-                      _InfoRow(label: 'Dérivée', value: study.derivative),
-                      _InfoRow(label: 'Dérivée seconde', value: study.secondDerivative),
-                      _InfoRow(label: 'Période', value: study.period),
-                      _InfoRow(label: 'Parité', value: study.symmetry),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Racines',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      _InfoRow(
+                        label: _t('Domain', 'Domaine'),
+                        value: MathLibrary.sanitizeForDisplay(study.domain),
                       ),
-                      ...study.roots.map((item) => Text('• $item')).toList(),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Extrema',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      _InfoRow(
+                        label: _t('Derivative', 'Dérivée'),
+                        value: MathLibrary.sanitizeForDisplay(study.derivative),
                       ),
-                      ...study.extrema.map((item) => Text('• $item')).toList(),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Asymptotes',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      _InfoRow(
+                        label: _t('Second derivative', 'Dérivée seconde'),
+                        value: MathLibrary.sanitizeForDisplay(study.secondDerivative),
                       ),
-                      ...study.asymptotes.map((item) => Text('• $item')).toList(),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Tableau de variation',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      _InfoRow(
+                        label: _t('Period', 'Période'),
+                        value: MathLibrary.sanitizeForDisplay(study.period),
                       ),
-                      Text(study.variationTable),
+                      _InfoRow(
+                        label: _t('Symmetry', 'Symétrie'),
+                        value: MathLibrary.sanitizeForDisplay(study.symmetry),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _t('Roots', 'Racines'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      ...study.roots.map((item) => Text('• ${MathLibrary.sanitizeForDisplay(item)}')).toList(),
+                      const SizedBox(height: 8),
+                      Text(
+                        _t('Extrema', 'Extrema'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      ...study.extrema.map((item) => Text('• ${MathLibrary.sanitizeForDisplay(item)}')).toList(),
+                      const SizedBox(height: 8),
+                      Text(
+                        _t('Asymptotes', 'Asymptotes'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      ...study.asymptotes.map((item) => Text('• ${MathLibrary.sanitizeForDisplay(item)}')).toList(),
+                      const SizedBox(height: 8),
+                      Text(
+                        _t('Variation table', 'Tableau de variation'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(MathLibrary.sanitizeForDisplay(study.variationTable)),
                     ],
                   ),
                 ),

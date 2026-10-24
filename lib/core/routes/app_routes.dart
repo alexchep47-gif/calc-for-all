@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/calculator/calculator_screen.dart';
-import '../../features/solver/solver_screen.dart';
+import '../../features/graph/graph_screen.dart';
 import '../../features/complex/complex_screen.dart';
 import '../../features/history/history_screen.dart';
 import '../../features/settings/settings_screen.dart';

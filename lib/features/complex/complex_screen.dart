@@ -68,7 +68,6 @@ class MathLibrary {
     return double.nan;
   }
 
-  /// Normalise 2x → 2*x, ln → log, ^, π…
   static String normalizeExpression(String input) {
     var s = input.trim();
     s = s.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
@@ -94,8 +93,6 @@ class MathLibrary {
     return s;
   }
 
-  /// Affichage : entier si possible, sinon exact symbolique si possible,
-  /// sinon fraction simple, sinon décimale courte.
   static String format(double v, {bool preferExact = true}) {
     if (v.isNaN) return 'Erreur mathématique';
     if (v.isInfinite) return v.isNegative ? '-∞' : '+∞';
@@ -227,7 +224,6 @@ class MathLibrary {
     return '$n/$d';
   }
 
-  /// Argument en fraction de π (ex. π/3, −π/2, 3π/4).
   static String formatArgAsPi(double arg) {
     if (arg.isNaN) return 'Erreur mathématique';
     var a = arg;
@@ -273,7 +269,7 @@ class ComplexScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: Text('Complex calculator'),
+        child: Text('Calcul complexe'),
       ),
     );
   }

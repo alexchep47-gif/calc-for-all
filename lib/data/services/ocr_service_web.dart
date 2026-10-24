@@ -6,7 +6,6 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 class OcrService {
   final ImagePicker _picker = ImagePicker();
 
-  /// [script] : latin (FR/EN), chinese, japanese, korean, devanagari
   Future<String?> recognizeExpression({
     ImageSource source = ImageSource.camera,
     TextRecognitionScript script = TextRecognitionScript.latin,
@@ -74,20 +73,26 @@ class OcrService {
       ',': '.',
     };
 
-    s = s.replaceAllMapped(RegExp(r'[×·÷−–—²³√πΠ∫≤≥≠∞…’“”]'), (m) {
+    s = s.replaceAllMapped(RegExp(r'[×·÷−–—²³√πΠ∫≤≥≠∞…’“”]'), (Match m) {
       return map[m.group(0)!] ?? m.group(0)!;
     });
 
-    s = s.replaceAllMapped(RegExp(r'(?<=\d)\s*([a-zA-Z])'), (m) => '*${m.group(1)}');
-    s = s.replaceAllMapped(RegExp(r'(?<=[a-zA-Z)])\s*(\d)'), (m) => '*${m.group(1)}');
+    s = s.replaceAllMapped(
+      RegExp(r'(?<=\d)\s*([a-zA-Z])'),
+      (Match m) => '*${m.group(1)}',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'(?<=[a-zA-Z)])\s*(\d)'),
+      (Match m) => '*${m.group(1)}',
+    );
     s = s.replaceAllMapped(
       RegExp(r'(?i)\b(sin|cos|tan|ln|log|exp|sqrt)\s*\(([^)]*)\)'),
-      (m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!})',
+      (Match m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!})',
     );
 
     s = s.replaceAllMapped(
       RegExp(r'(?i)\b(sin|cos|tan|ln|log|exp|sqrt)\s*([a-zA-Z0-9(])'),
-      (m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!}',
+      (Match m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!}',
     );
 
     s = s.replaceAll(RegExp(r'\bO\b', caseSensitive: false), '0');
@@ -98,7 +103,7 @@ class OcrService {
 
     s = s.replaceAllMapped(
       RegExp(r'(?i)\b(sinx|cosx|tanx|lnx|logx)\b'),
-      (m) {
+      (Match m) {
         final f = m.group(0)!.toLowerCase();
         final name = f.substring(0, f.length - 1);
         return '$name(x)';
@@ -141,10 +146,9 @@ class OcrService {
 
     s = s.replaceAllMapped(
       RegExp(r'(?<![A-Za-z])x\s*\^\s*(\d)'),
-      (m) => 'x^${m.group(1)}',
+      (Match m) => 'x^${m.group(1)}',
     );
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
     return s;
   }
 }
-

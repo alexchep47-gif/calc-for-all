@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/calculator/calculator_screen.dart';
-import '../../features/graph/graph_screen.dart';
+import '../../features/solver/solver_screen.dart';
 import '../../features/complex/complex_screen.dart';
 import '../../features/history/history_screen.dart';
 import '../../features/settings/settings_screen.dart';
@@ -46,7 +46,7 @@ class AppRoutes {
         onboarding: (context) => const OnboardingScreen(),
         home: (context) => const HomeScreen(),
         calculator: (context) => const CalculatorScreen(),
-        graph: (context) => const GraphScreen(),
+        graph: (context) => const SolverScreen(),
         complex: (context) => const ComplexScreen(),
         history: (context) => const HistoryScreen(),
         settings: (context) => const SettingsScreen(),
@@ -65,4 +65,3 @@ class AppRoutes {
         ocr: (context) => const OcrScreen(),
       };
 }
-

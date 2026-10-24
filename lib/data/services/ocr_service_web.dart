@@ -80,11 +80,15 @@ class OcrService {
 
     s = s.replaceAllMapped(RegExp(r'(?<=\d)\s*([a-zA-Z])'), (m) => '*${m.group(1)}');
     s = s.replaceAllMapped(RegExp(r'(?<=[a-zA-Z)])\s*(\d)'), (m) => '*${m.group(1)}');
-    s = s.replaceAllMapped(RegExp(r'(?i)\b(sin|cos|tan|ln|log|exp|sqrt)\s*\(([^)]*)\)'),
-        (m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!})');
+    s = s.replaceAllMapped(
+      RegExp(r'(?i)\b(sin|cos|tan|ln|log|exp|sqrt)\s*\(([^)]*)\)'),
+      (m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!})',
+    );
 
-    s = s.replaceAllMapped(RegExp(r'(?i)\b(sin|cos|tan|ln|log|exp|sqrt)\s*([a-zA-Z0-9(])'),
-        (m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!}');
+    s = s.replaceAllMapped(
+      RegExp(r'(?i)\b(sin|cos|tan|ln|log|exp|sqrt)\s*([a-zA-Z0-9(])'),
+      (m) => '${m.group(1)!.toLowerCase()}(${m.group(2)!}',
+    );
 
     s = s.replaceAll(RegExp(r'\bO\b', caseSensitive: false), '0');
     s = s.replaceAll(RegExp(r'\bI\b', caseSensitive: false), '1');
@@ -92,12 +96,14 @@ class OcrService {
     s = s.replaceAll(RegExp(r'\bZ\b', caseSensitive: false), '2');
     s = s.replaceAll(RegExp(r'\bG\b', caseSensitive: false), '6');
 
-    s = s.replaceAllMapped(RegExp(r'(?i)\b(sinx|cosx|tanx|lnx|logx)\b'),
-        (m) => {
-          final f = m.group(0)!.toLowerCase();
-          final name = f.substring(0, f.length - 1);
-          return '$name(x)';
-        });
+    s = s.replaceAllMapped(
+      RegExp(r'(?i)\b(sinx|cosx|tanx|lnx|logx)\b'),
+      (m) {
+        final f = m.group(0)!.toLowerCase();
+        final name = f.substring(0, f.length - 1);
+        return '$name(x)';
+      },
+    );
 
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
     return s;
@@ -133,184 +139,12 @@ class OcrService {
       }
     }
 
-    s = s.replaceAll(RegExp(r'(?<![A-Za-z])x\s*\^\s*(\d)'), (m) => 'x^${m.group(1)}');
+    s = s.replaceAllMapped(
+      RegExp(r'(?<![A-Za-z])x\s*\^\s*(\d)'),
+      (m) => 'x^${m.group(1)}',
+    );
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
     return s;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
+
 /// Bibliothèque mathématique interne (jamais affichée sous ce nom dans l’UI).
 class MathLibrary {
   static const double pi = math.pi;
@@ -21,6 +23,12 @@ class MathLibrary {
   static double pow(double a, double b) => math.pow(a, b).toDouble();
   static double log10(double x) => math.log(x) / math.ln10;
   static double ln(double x) => math.log(x);
+
+  static double cbrt(double x) {
+    if (x == 0) return 0;
+    final sign = x < 0 ? -1.0 : 1.0;
+    return sign * math.pow(x.abs(), 1 / 3).toDouble();
+  }
 
   static double call1(String name, double a) {
     switch (name) {
@@ -53,9 +61,7 @@ class MathLibrary {
       case 'sqrt':
         return math.sqrt(a);
       case 'cbrt':
-        return a >= 0
-            ? math.pow(a, 1 / 3).toDouble()
-            : -math.pow(-a, 1 / 3).toDouble();
+        return cbrt(a);
       case 'abs':
         return a.abs();
     }
@@ -136,10 +142,11 @@ class MathLibrary {
 
     for (var n = 2; n <= 100; n++) {
       final root = math.sqrt(n.toDouble());
+      final cube = cbrt(n.toDouble());
       if ((value - root).abs() < eps) return '√${n}';
       if ((value + root).abs() < eps) return '-√${n}';
-      if ((value - math.cbrt(n.toDouble())).abs() < eps) return '∛${n}';
-      if ((value + math.cbrt(n.toDouble())).abs() < eps) return '-∛${n}';
+      if ((value - cube).abs() < eps) return '∛${n}';
+      if ((value + cube).abs() < eps) return '-∛${n}';
 
       final ln = math.log(n.toDouble());
       if ((value - ln).abs() < eps) return 'ln($n)';
@@ -259,3 +266,15 @@ class MathLibrary {
   }
 }
 
+class ComplexScreen extends StatelessWidget {
+  const ComplexScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Text('Complex calculator'),
+      ),
+    );
+  }
+}

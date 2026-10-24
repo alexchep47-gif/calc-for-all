@@ -22,12 +22,31 @@ class MathPretty {
     'i': 'ⁱ',
   };
 
-  /// Formate pour l'affichage uniquement (pas pour l'évaluation).
   static String format(String raw) {
     if (raw.trim().isEmpty) return raw;
     var s = raw.trim();
 
+    s = s.replaceAll('−', '-').replaceAll('×', '*').replaceAll('÷', '/');
+
+    s = _normalizeLatex(s);
+
+    s = s.replaceAllMapped(RegExp(r'\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}'),
+        (m) => '(${m[1]!})/(${m[2]!})');
+    s = s.replaceAllMapped(RegExp(r'\\left\s*\(|\\right\s*\)'), (_) => '');
+    s = s.replaceAllMapped(RegExp(r'\\left\s*\[|\\right\s*\]'), (_) => '');
+    s = s.replaceAll('{', '(').replaceAll('}', ')');
+
+    s = s.replaceAllMapped(RegExp(r'\\(sin|cos|tan|sec|csc|cot|ln|log|exp|sqrt|cbrt)\b'),
+        (m) => m[1]!);
+    s = s.replaceAllMapped(RegExp(r'\\pi\b'), (_) => 'pi');
+
+    s = s.replaceAll('π', 'pi');
+    s = s.replaceAll('Pi', 'pi');
+    s = s.replaceAll('PI', 'pi');
+
     s = s.replaceAll('×', '*').replaceAll('÷', '/');
+    s = s.replaceAllMapped(RegExp(r'\b(log|ln|sin|cos|tan|sec|csc|cot|exp)\s*\(([^()]*)\)'),
+        (m) => '${m[1]}(${m[2]})');
 
     // Puissances → exposants Unicode
     s = _powersToSuperscript(s);
@@ -63,6 +82,35 @@ class MathPretty {
     return s;
   }
 
+  static String _normalizeLatex(String raw) {
+    var s = raw.trim();
+    s = s.replaceAll('\\cdot', '*');
+    s = s.replaceAll('\\times', '*');
+    s = s.replaceAll('\\div', '/');
+    s = s.replaceAll('\\left', '');
+    s = s.replaceAll('\\right', '');
+    s = s.replaceAll('\\,', '');
+    s = s.replaceAll('\\;','');
+    s = s.replaceAll('\\pi', 'pi');
+    s = s.replaceAll('\\sqrt', 'sqrt');
+    s = s.replaceAll('\\cbrt', 'cbrt');
+    s = s.replaceAll('\\sin', 'sin');
+    s = s.replaceAll('\\cos', 'cos');
+    s = s.replaceAll('\\tan', 'tan');
+    s = s.replaceAll('\\sec', 'sec');
+    s = s.replaceAll('\\csc', 'csc');
+    s = s.replaceAll('\\cot', 'cot');
+    s = s.replaceAll('\\ln', 'ln');
+    s = s.replaceAll('\\log', 'log');
+    s = s.replaceAll('\\exp', 'exp');
+    s = s.replaceAll('\\alpha', 'alpha');
+    s = s.replaceAll('\\beta', 'beta');
+    s = s.replaceAll('\\theta', 'theta');
+    s = s.replaceAll('\\gamma', 'gamma');
+    s = s.replaceAll('\\sum', 'sum');
+    return s;
+  }
+
   static String _powersToSuperscript(String s) {
     var out = s;
 
@@ -84,7 +132,7 @@ class MathPretty {
 
     // x^(2), a^(-1)
     out = out.replaceAllMapped(
-      RegExp(r'([a-zA-Z]\w*|\d+(?:\.\d+)?)\^\(([-+]?\d+)\)'),
+      RegExp(r'([a-zA-Z]\w*|\d+(?:\.\d+)?)\^\((-?\d+)\)'),
       (m) => '${m[1]}${_toSup(m[2]!)}',
     );
 
@@ -171,3 +219,132 @@ class MathPretty {
   static String secondDerivativeLine(String expr) =>
       'f″(x) = ${format(expr)}';
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

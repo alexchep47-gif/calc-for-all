@@ -1,245 +1,267 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Bibliothèque mathématique interne (jamais affichée sous ce nom dans l’UI).
-class MathLibrary {
-  static const double pi = math.pi;
-  static const double e = math.e;
+import '../../data/models/complex_number.dart';
+import '../../data/services/complex_service.dart';
 
-  static final Set<String> functionNames = {
-    'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
-    'sinh', 'cosh', 'tanh',
-    'log', 'ln', 'log10', 'exp', 'sqrt', 'cbrt', 'abs',
-  };
+enum ComplexOperation { add, subtract, multiply, divide }
 
-  static double clean(double v) {
-    if (v.isNaN || v.isInfinite) return v;
-    final r = v.roundToDouble();
-    if ((v - r).abs() < 1e-10) return r;
-    return v;
-  }
-
-  static double pow(double a, double b) => math.pow(a, b).toDouble();
-  static double log10(double x) => math.log(x) / math.ln10;
-  static double ln(double x) => math.log(x);
-
-  static double cbrt(double x) {
-    if (x == 0) return 0;
-    final sign = x < 0 ? -1.0 : 1.0;
-    return sign * math.pow(x.abs(), 1 / 3).toDouble();
-  }
-
-  static double call1(String name, double a) {
-    switch (name) {
-      case 'sin':
-        return math.sin(a);
-      case 'cos':
-        return math.cos(a);
-      case 'tan':
-        return math.tan(a);
-      case 'asin':
-        return math.asin(a);
-      case 'acos':
-        return math.acos(a);
-      case 'atan':
-        return math.atan(a);
-      case 'sinh':
-        return (math.exp(a) - math.exp(-a)) / 2;
-      case 'cosh':
-        return (math.exp(a) + math.exp(-a)) / 2;
-      case 'tanh':
-        final e2 = math.exp(2 * a);
-        return (e2 - 1) / (e2 + 1);
-      case 'log':
-      case 'ln':
-        return math.log(a);
-      case 'log10':
-        return log10(a);
-      case 'exp':
-        return math.exp(a);
-      case 'sqrt':
-        return math.sqrt(a);
-      case 'cbrt':
-        return cbrt(a);
-      case 'abs':
-        return a.abs();
-    }
-    return double.nan;
-  }
-
-  static String normalizeExpression(String input) {
-    var s = input.trim();
-    s = s.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
-    s = s.replaceAll('π', 'pi').replaceAll('Π', 'pi');
-    s = s.replaceAllMapped(RegExp(r'\bln\s*\('), (_) => 'log(');
-    s = s.replaceAllMapped(RegExp(r'\bin\s*\('), (_) => 'log(');
-    s = s.replaceAllMapped(RegExp(r'(\d)\s*([a-zA-Z(])'), (m) => '${m[1]}*${m[2]}');
-    s = s.replaceAllMapped(RegExp(r'\)\s*(\d)'), (m) => ')*${m[1]}');
-    s = s.replaceAllMapped(RegExp(r'\)\s*([a-zA-Z(])'), (m) => ')*${m[1]}');
-    s = s.replaceAllMapped(RegExp(r'(\d)\s*pi\b'), (m) => '${m[1]}*pi');
-    return s;
-  }
-
-  static String format(double v, {bool preferExact = true}) {
-    if (v.isNaN) return 'Erreur mathématique';
-    if (v.isInfinite) return v.isNegative ? '-∞' : '+∞';
-
-    final c = clean(v);
-    if (c == 0) return '0';
-    if ((c - c.roundToDouble()).abs() < 1e-10) {
-      return c.toInt().toString();
-    }
-
-    if (preferExact) {
-      final exact = _symbolicForm(c);
-      if (exact != null) return exact;
-    }
-
-    final frac = toSimpleFraction(c);
-    if (frac != null) return frac;
-    return _trimDecimal(c);
-  }
-
-  static String _trimDecimal(double c) {
-    var s = c.toStringAsFixed(10);
-    s = s.replaceFirst(RegExp(r'\.?0+$'), '');
-    return s;
-  }
-
-  static String? _symbolicForm(double value) {
-    const eps = 1e-7;
-    final absVal = value.abs();
-
-    if ((absVal - math.e).abs() < eps) return value < 0 ? '-e' : 'e';
-
-    final piRatio = value / math.pi;
-    final piRounded = piRatio.roundToDouble();
-    if ((piRatio - piRounded).abs() < eps) return _piMultipleLabel(piRounded);
-
-    final fracPi = _simplePiFraction(value);
-    if (fracPi != null) return fracPi;
-
-    for (var n = 2; n <= 100; n++) {
-      final root = math.sqrt(n.toDouble());
-      final cube = cbrt(n.toDouble());
-      if ((value - root).abs() < eps) return '√${n}';
-      if ((value + root).abs() < eps) return '-√${n}';
-      if ((value - cube).abs() < eps) return '∛${n}';
-      if ((value + cube).abs() < eps) return '-∛${n}';
-
-      final ln = math.log(n.toDouble());
-      if ((value - ln).abs() < eps) return 'ln($n)';
-      if ((value + ln).abs() < eps) return '-ln($n)';
-
-      final expN = math.exp(n.toDouble());
-      if ((value - expN).abs() < eps) return 'exp($n)';
-      if ((value + expN).abs() < eps) return '-exp($n)';
-    }
-
-    if ((value - 1).abs() < eps) return '1';
-    if ((value + 1).abs() < eps) return '-1';
-    return null;
-  }
-
-  static String? _simplePiFraction(double value) {
-    const eps = 1e-7;
-    final q = value / math.pi;
-    final numer = q * 1000;
-    final approx = numer.round();
-    if ((q - (approx / 1000)).abs() < eps) {
-      final num = approx;
-      if (num == 0) return '0';
-      final g = _gcd(num.abs(), 1000);
-      final n = (num ~/ g);
-      final d = (1000 ~/ g);
-      if (d == 1) {
-        return n == 1 ? 'π' : n == -1 ? '-π' : '${n}π';
-      }
-      return n == 1 ? 'π/$d' : n == -1 ? '-π/$d' : '${n}π/$d';
-    }
-    return null;
-  }
-
-  static String _piMultipleLabel(double k) {
-    if (k == 0) return '0';
-    if (k == 1) return 'π';
-    if (k == -1) return '-π';
-    return '${k.toInt()}π';
-  }
-
-  static String? toSimpleFraction(double value) {
-    if (value == 0) return '0';
-    const maxDenom = 10000;
-    var bestNumerator = value.round();
-    var bestDenominator = 1;
-    var bestError = (bestNumerator / bestDenominator - value).abs();
-    for (var denom = 1; denom <= maxDenom; denom++) {
-      final num = (value * denom).round();
-      final error = (num / denom - value).abs();
-      if (error < bestError) {
-        bestNumerator = num;
-        bestDenominator = denom;
-        bestError = error;
-      }
-      if (error < 1e-10) {
-        final g = _gcd(num.abs(), denom);
-        final n = num ~/ g;
-        final d = denom ~/ g;
-        if (d == 1) return n.toString();
-        return '$n/$d';
-      }
-    }
-    if (bestError > 1e-6) return null;
-    final g = _gcd(bestNumerator.abs(), bestDenominator);
-    final n = bestNumerator ~/ g;
-    final d = bestDenominator ~/ g;
-    if (d == 1) return n.toString();
-    return '$n/$d';
-  }
-
-  static String formatArgAsPi(double arg) {
-    if (arg.isNaN) return 'Erreur mathématique';
-    var a = arg;
-    while (a > math.pi) a -= 2 * math.pi;
-    while (a <= -math.pi) a += 2 * math.pi;
-    if (a.abs() < 1e-10) return '0';
-
-    final r = a / math.pi;
-    final frac = toSimpleFraction(r);
-    if (frac == null) return '${format(a)} rad';
-    if (frac == '1') return 'π';
-    if (frac == '-1') return '−π';
-    if (frac.contains('/')) {
-      final p = frac.split('/');
-      final n = p[0];
-      final d = p[1];
-      if (n == '1') return 'π/$d';
-      if (n == '-1') return '−π/$d';
-      return '$nπ/$d';
-    }
-    if (frac.startsWith('-')) return '−${frac.substring(1)}π';
-    return '${frac}π';
-  }
-
-  static int _gcd(int a, int b) {
-    while (b != 0) {
-      final t = b;
-      b = a % b;
-      a = t;
-    }
-    return a == 0 ? 1 : a;
-  }
-}
-
-class ComplexScreen extends StatelessWidget {
+class ComplexScreen extends StatefulWidget {
   const ComplexScreen({super.key});
 
   @override
+  State<ComplexScreen> createState() => _ComplexScreenState();
+}
+
+class _ComplexScreenState extends State<ComplexScreen> {
+  final _service = ComplexService();
+  final _aController = TextEditingController(text: '3+4i');
+  final _bController = TextEditingController(text: '1-2i');
+
+  ComplexOperation _operation = ComplexOperation.add;
+  String _resultText = '7+2i';
+  String _detailsText = 'Z = (3+4i) + (1-2i) = 4+2i';
+
+  @override
+  void dispose() {
+    _aController.dispose();
+    _bController.dispose();
+    super.dispose();
+  }
+
+  void _calculate() {
+    final a = _service.parse(_aController.text);
+    final b = _service.parse(_bController.text);
+
+    if (a == null || b == null) {
+      setState(() {
+        _resultText = 'Entrée invalide';
+        _detailsText = 'Utilise une forme du type 3+4i, -2.5-1.2i, 5i, -i, 7';
+      });
+      return;
+    }
+
+    try {
+      late final ComplexNumber result;
+      switch (_operation) {
+        case ComplexOperation.add:
+          result = _service.add(a, b);
+          break;
+        case ComplexOperation.subtract:
+          result = _service.subtract(a, b);
+          break;
+        case ComplexOperation.multiply:
+          result = _service.multiply(a, b);
+          break;
+        case ComplexOperation.divide:
+          result = _service.divide(a, b);
+          break;
+      }
+
+      final mod = _service.modulus(result);
+      final argDeg = _service.argument(result);
+      final conj = _service.conjugate(result);
+
+      setState(() {
+        _resultText = result.toString();
+        _detailsText = 'Module : $mod\n'
+            'Argument : $argDeg\n'
+            'Conjugué : $conj\n'
+            'Forme polaire : ${result.toPolarString()}';
+      });
+    } catch (_) {
+      setState(() {
+        _resultText = 'Erreur';
+        _detailsText = 'Division par zéro ou calcul impossible.';
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('Calcul complexe'),
+    final operationLabel = switch (_operation) {
+      ComplexOperation.add => '+',
+      ComplexOperation.subtract => '-',
+      ComplexOperation.multiply => '×',
+      ComplexOperation.divide => '÷',
+    };
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Nombres complexes'),
       ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Opération',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    SegmentedButton<ComplexOperation>(
+                      segments: const [
+                        ButtonSegment(value: ComplexOperation.add, label: Text('+')),
+                        ButtonSegment(
+                          value: ComplexOperation.subtract,
+                          label: Text('-'),
+                        ),
+                        ButtonSegment(
+                          value: ComplexOperation.multiply,
+                          label: Text('×'),
+                        ),
+                        ButtonSegment(
+                          value: ComplexOperation.divide,
+                          label: Text('÷'),
+                        ),
+                      ],
+                      selected: {_operation},
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          _operation = selection.first;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _aController,
+                      decoration: const InputDecoration(
+                        labelText: 'Premier nombre complexe',
+                        hintText: '3+4i',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _bController,
+                      decoration: const InputDecoration(
+                        labelText: 'Deuxième nombre complexe',
+                        hintText: '1-2i',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _calculate,
+                        icon: const Icon(Icons.calculate_outlined),
+                        label: const Text('Calculer'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Résultat',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_aController.text} $operationLabel ${_bController.text} = $_resultText',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Détails',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _detailsText,
+                      style: const TextStyle(height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Exemples',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _ExampleChip(
+                          label: '3+4i + 1-2i',
+                          onTap: () {
+                            _aController.text = '3+4i';
+                            _bController.text = '1-2i';
+                            _operation = ComplexOperation.add;
+                            _calculate();
+                          },
+                        ),
+                        _ExampleChip(
+                          label: '2-3i × 1+i',
+                          onTap: () {
+                            _aController.text = '2-3i';
+                            _bController.text = '1+i';
+                            _operation = ComplexOperation.multiply;
+                            _calculate();
+                          },
+                        ),
+                        _ExampleChip(
+                          label: '5i / 2-i',
+                          onTap: () {
+                            _aController.text = '5i';
+                            _bController.text = '2-i';
+                            _operation = ComplexOperation.divide;
+                            _calculate();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExampleChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _ExampleChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: Text(label),
+      onPressed: onTap,
+      backgroundColor: Colors.blueGrey.withOpacity(0.18),
     );
   }
 }

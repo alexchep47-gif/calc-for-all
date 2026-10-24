@@ -173,7 +173,8 @@ class _ComplexScreenState extends State<ComplexScreen> {
         return 'z${e.key + 1} = ${zk.toString()}\n'
             '    arg = ${MathLibrary.formatArgAsPi(zk.argument)}';
       }).join('\n');
-      _extra = 'Racines de degré $n — module = ${MathLibrary.format(radius)}';
+      _extra =
+          'Racines de degré $n — module = ${MathLibrary.format(radius)}';
     });
   }
 
@@ -191,220 +192,394 @@ class _ComplexScreenState extends State<ComplexScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF111827) : const Color(0xFFF7F8FC);
-    final panel = isDark ? const Color(0xFF182235) : Colors.white;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nombres complexes'),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark
-                ? [const Color(0xFF0B1220), const Color(0xFF111827)]
-                : [const Color(0xFFF5F7FF), const Color(0xFFE9ECF7)],
+      appBar: AppBar(title: const Text('Nombres complexes')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              const Text('Nombre de z : '),
+              DropdownButton<int>(
+                value: _count,
+                items: [1, 2, 3, 4, 5]
+                    .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() {
+                    for (final c in _ctrls) {
+                      c.dispose();
+                    }
+                    _count = v;
+                    _rebuildCtrls();
+                  });
+                },
+              ),
+            ],
           ),
-        ),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Card(
-              color: panel,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: BorderSide(
-                  color: isDark ? Colors.white10 : Colors.black12,
+          const SizedBox(height: 8),
+          ...List.generate(_count, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(
+                controller: _ctrls[i],
+                decoration: InputDecoration(
+                  labelText: 'z${i + 1} (ex: 3+4i ou 2cis(π/3))',
+                  border: const OutlineInputBorder(),
                 ),
               ),
+            );
+          }),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final op in ['+', '-', '*', '/', '|z|', 'conj', 'polar'])
+                FilledButton(
+                  onPressed: () => _compute(op),
+                  child: Text(op),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _rootIndexCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Indice n (racines n-ièmes)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _nthRoots,
+                child: const Text('Racines'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_result.isNotEmpty)
+            Card(
               child: Padding(
                 padding: const EdgeInsets.all(14),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.functions_rounded),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Module, argument et opérations',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'z = a + bi',
-                      style: TextStyle(
-                        color: isDark ? Colors.blue[200] : Colors.blue[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(_result,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, height: 1.4)),
+                    if (_extra.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(_extra, style: const TextStyle(height: 1.35)),
+                    ],
                   ],
                 ),
               ),
+            ).animate().fadeIn(),
+          const SizedBox(height: 16),
+          const Text('Linéarisation (rappels)',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          TextField(
+            controller: _linearizeCtrl,
+            decoration: const InputDecoration(
+              hintText: 'sin(x)^2, cos(x)^3…',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Text('Nombre de z : '),
-                DropdownButton<int>(
-                  value: _count,
-                  items: [1, 2, 3, 4, 5]
-                      .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() {
-                      for (final c in _ctrls) {
-                        c.dispose();
-                      }
-                      _count = v;
-                      _rebuildCtrls();
-                    });
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...List.generate(_count, (i) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: TextField(
-                  controller: _ctrls[i],
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: panel,
-                    labelText: 'z${i + 1} (ex: 3+4i ou 2cis(π/3))',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              );
-            }),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final op in ['+', '-', '*', '/', '|z|', 'conj', 'polar'])
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () => _compute(op),
-                    child: Text(op),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _rootIndexCtrl,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: panel,
-                      labelText: 'Indice n (racines n-ièmes)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _nthRoots,
-                  child: const Text('Racines'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_result.isNotEmpty)
-              Card(
-                color: panel,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  side: BorderSide(
-                    color: isDark ? Colors.white10 : Colors.black12,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _result,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          height: 1.4,
-                        ),
-                      ),
-                      if (_extra.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _extra,
-                          style: const TextStyle(height: 1.35),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ).animate().fadeIn(),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: panel,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isDark ? Colors.white10 : Colors.black12,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Linéarisation (rappels)',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _linearizeCtrl,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: surface,
-                      hintText: 'sin(x)^2, cos(x)^3…',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: _linearize,
-                    icon: const Icon(Icons.auto_fix_high_rounded),
-                    label: const Text('Linéariser'),
-                  ),
-                  if (_linearized.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _linearized,
-                        style: const TextStyle(height: 1.5),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+          TextButton(onPressed: _linearize, child: const Text('Linéariser')),
+          if (_linearized.isNotEmpty) Text(_linearized),
+        ],
       ),
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

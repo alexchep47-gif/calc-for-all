@@ -236,7 +236,7 @@ class _CurvePainter extends CustomPainter {
       final py = yToPy(0.0);
       final textPainter = TextPainter(
         text: TextSpan(text: i.toString(), style: labelStyle),
-        textDirection: Directionality.of(context),
+        textDirection: TextDirection.ltr,
       )..layout();
       textPainter.paint(canvas, Offset(px - 4, py + 6));
     }
@@ -245,7 +245,7 @@ class _CurvePainter extends CustomPainter {
       final py = yToPy(i.toDouble());
       final textPainter = TextPainter(
         text: TextSpan(text: i.toString(), style: labelStyle),
-        textDirection: Directionality.of(context),
+        textDirection: TextDirection.ltr,
       )..layout();
       textPainter.paint(canvas, Offset(originX + 6, py - 8));
     }
@@ -258,9 +258,5 @@ class _CurvePainter extends CustomPainter {
       oldDelegate.xMax != xMax ||
       oldDelegate.yMin != yMin ||
       oldDelegate.yMax != yMax;
-}
-
-extension on BuildContext {
-  bool get isDarkMode => Theme.of(this).brightness == Brightness.dark;
 }
 
